@@ -156,14 +156,14 @@ def touch(fname):
 
 def conditional(value, param):  # conditional(argument.run, "--run")
     if value:
-        return param
+	return str(param)
     else:
         return ""
 
 
 def optional(param, value):  # optional("-V", argument.myvcf)
     if value:
-        return " " + param + str(value) + " "
+	return " {}{} ".format(param, value)
     else:
         return ""
 
@@ -171,14 +171,14 @@ def optional(param, value):  # optional("-V", argument.myvcf)
 def repeat(param, values):  # repeat("INPUT=", input.bamsToMerge)
     retstr = ""
     for value in values:
-        retstr += " " + param + value
+	retstr += " {}{}".format(param, value)
     return retstr + " "
 
 
-def required(param, value):  # required("-b", self.algorithm) ==> -b bwtsw
+def required(param, value):  # required("-b ", self.algorithm) ==> -b bwtsw
     if param is None:
         raise ValueError("parameter {} is required".format(param))
-    retstr = " " + param + value + " "
+    retstr = " {}{} ".format(param, value)
     return retstr
 
 

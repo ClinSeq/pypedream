@@ -28,7 +28,7 @@ class PypedreamPipeline:
         """
         :type job:Job
         """
-        logging.info("Added step {}".format(job.get_name()))
+	logging.debug("Added step {}".format(job.get_name()))
         inputs = []
         outputs = []
         for varname in job.__dict__:
@@ -42,7 +42,7 @@ class PypedreamPipeline:
         logging.debug("  inputs: " + str(inputs))
         logging.debug("  outputs: " + str(outputs))
         job.set_log()
-        logging.info("Will write log to {}".format(job.log))
+	logging.debug("Will write log to {}".format(job.log))
         if job.all_donefiles_exists():
             job.status = PypedreamStatus.COMPLETED
 

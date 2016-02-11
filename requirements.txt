@@ -1,0 +1,4 @@
+click
+git+https://github.com/dakl/localq.git
+
+

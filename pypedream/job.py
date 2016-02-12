@@ -176,7 +176,7 @@ def repeat(param, values):  # repeat("INPUT=", input.bamsToMerge)
 
 
 def required(param, value):  # required("-b ", self.algorithm) ==> -b bwtsw
-    if param is None:
+    if value is None:
         raise ValueError("parameter {} is required".format(param))
     retstr = " {}{} ".format(param, value)
     return retstr

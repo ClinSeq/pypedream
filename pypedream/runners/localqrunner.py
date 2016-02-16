@@ -81,8 +81,9 @@ class Localqrunner(Runner):
 
             pipeline.cleanup()
 
-        print self.server.list_queue()
-        print [j.info_dict() for j in self.server.graph.nodes()]
+    def get_job_stats(self):
+        return [j.info_dict() for j in self.server.graph.nodes()]
+
 
 # http://stackoverflow.com/questions/480214
 def uniq(seq):  # renamed from f7()

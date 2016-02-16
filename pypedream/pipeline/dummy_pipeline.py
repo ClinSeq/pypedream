@@ -10,6 +10,7 @@ class Pipeline(PypedreamPipeline):
 
         rnd1 = Urandom()
         rnd1.output = outdir + "/" + first
+        rnd1.threads = 2
         self.add(rnd1)
 
         rnd2 = Urandom()

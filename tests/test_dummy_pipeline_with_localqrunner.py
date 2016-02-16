@@ -17,7 +17,7 @@ class TestDummyPipeline(unittest.TestCase):
         #sys.stderr.write(self.outdir + "\n")
         self.p = dummy_pipeline.Pipeline(self.outdir, "first", "second", "third")
         self.p.add_edges()
-        runner = runners.localqrunner.Localqrunner()
+        runner = runners.localqrunner.Localqrunner(2)
         runner.run(self.p)
 
     def test_output_exists(self):

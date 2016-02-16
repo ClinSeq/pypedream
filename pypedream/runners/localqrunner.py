@@ -48,8 +48,8 @@ class Localqrunner(Runner):
         self.server.run()
 
         def get_jobstrs(x):
+            time.sleep(.02)
             running_jobs = [j.get_name() for j in all_ordered_jobs if j.status == PypedreamStatus.RUNNING]
-            print running_jobs
             return str(",".join(running_jobs))
 
         with progressbar(length=len(all_ordered_jobs), item_show_func=get_jobstrs) as bar:

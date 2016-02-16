@@ -1,5 +1,8 @@
 import logging
 import os
+
+import uuid
+
 from pypedream import constants
 from pypedream.pypedreamstatus import PypedreamStatus
 
@@ -118,7 +121,10 @@ class Job:
         idx = hashes.index(hash(self))
 
         logging.debug("Task index is " + str(idx))
-        self.script = script_dir + "/" + str(idx) + "-" + self.get_name() + ".sh"
+        self.script = "{dir}/{idx}-{name}-{uuid}.sh".format(dir=script_dir,
+                                                            idx=idx,
+                                                            name=self.get_name(),
+                                                            uuid=uuid.uuid4())
 
         f = open(self.script, 'w')
         f.write("#!/usr/bin/env bash\n")

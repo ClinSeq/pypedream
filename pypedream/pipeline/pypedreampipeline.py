@@ -13,11 +13,9 @@ sys.path.insert(0, parentdir)
 
 __author__ = 'dankle'
 
-default_scriptdir = "/tmp/.pypedream"
-
 
 class PypedreamPipeline:
-    def __init__(self, scriptdir=default_scriptdir, run=None, dot=None):
+    def __init__(self, scriptdir="~/.pypedream/scripts/", run=None, dot=None):
         self.graph = nx.MultiDiGraph()
         self.scriptdir = os.path.abspath(os.path.expandvars(os.path.expanduser(scriptdir)))
         self.run = run

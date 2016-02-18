@@ -48,7 +48,6 @@ class Localqrunner(Runner):
         self.server.run()
 
         def get_jobstrs(x):
-            time.sleep(.02)
             running_jobs = [j.get_name() for j in all_ordered_jobs if j.status == PypedreamStatus.RUNNING]
             return str(",".join(running_jobs))
 
@@ -56,7 +55,7 @@ class Localqrunner(Runner):
             n_done = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
             bar.update(n_done)
             while True:
-                #time.sleep(0.1)
+                time.sleep(0.05)
                 n_done_current = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
                 n_done_new = n_done_current - n_done
 

@@ -1,9 +1,11 @@
 import logging
 import time
+import datetime
+
+import sys
 from click import progressbar
 from localq.localQ_server import LocalQServer
 from localq.status import Status
-
 from pypedream.runners.runner import Runner
 from pypedream.pypedreamstatus import PypedreamStatus
 from pypedream.pipeline.pypedreampipeline import PypedreamPipeline
@@ -23,6 +25,7 @@ def check_completed_jobs(jobs):
 
 class Localqrunner(Runner):
     def __init__(self, threads=1):
+        self.pipeline = None
         self.threads = threads
         self.server = None
 
@@ -32,53 +35,63 @@ class Localqrunner(Runner):
         :type pipeline: PypedreamPipeline
         :return:
         """
+        self.pipeline = pipeline
         self.server = LocalQServer(num_cores_available=self.threads, interval=0.1)
-
-        ordered_jobs_to_run = pipeline.get_ordered_jobs_to_run()
-        all_ordered_jobs = pipeline.get_ordered_jobs()
+        ordered_jobs_to_run = self.pipeline.get_ordered_jobs_to_run()
+        all_ordered_jobs = self.pipeline.get_ordered_jobs()
         for job in ordered_jobs_to_run:
-            depjobs = pipeline.get_dependencies(job)
+            depjobs = self.pipeline.get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j.status != PypedreamStatus.COMPLETED]
-
+            job.try_remove_failfile()
             # sys.stderr.write("job wants {} cores\n".format(job.threads))
 
             job.jobid = self.server.add_script(job.script, job.threads, stdout=job.log, stderr=job.log,
                                                name=job.get_name(), dependencies=depjobids)
             # sys.stderr.write("added job {} with deps {}\n".format(job.jobid, depjobids))
+
+        n_pending = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.PENDING])
+        n_done = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
+        n_failed = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED])
+        n_running = len([j for j in self.server.graph.nodes() if j.status() == Status.RUNNING])
+
         self.server.run()
 
-        def get_jobstrs(x):
-            running_jobs = [j.get_name() for j in all_ordered_jobs if j.status == PypedreamStatus.RUNNING]
-            return str(",".join(running_jobs))
+        start_time = datetime.datetime.now()
+        last_time = datetime.datetime.now()
 
-        with progressbar(length=len(all_ordered_jobs), item_show_func=get_jobstrs) as bar:
-            n_done = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
-            bar.update(n_done)
-            while True:
-                time.sleep(0.05)
-                n_done_current = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
-                n_done_new = n_done_current - n_done
+        logging.info("Pipeline starting with {} jobs.".format(len(all_ordered_jobs)))
+        logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-                # only update if value has changed
-                if n_done_new > 0:
-                    bar.update(n_done_new)
-                    n_done = n_done_current
-                # for all jobs in localq, get corresponding pipeline jobs
-                # update the pipeline job's status
-                for localqjob in self.server.get_ordered_jobs():
-                    pypedreamjob = pipeline.get_job_with_id(localqjob.jobid)
-                    pypedreamjob.status = localqjob.status()
-                    if pypedreamjob.status == PypedreamStatus.COMPLETED:
-                        pypedreamjob.complete()
-                    elif pypedreamjob.status == PypedreamStatus.FAILED:
-                        pypedreamjob.fail()
+        while self.server.get_runnable_jobs():
+            time.sleep(1)
+            self.update_job_status()
 
-                #check_completed_jobs(ordered_jobs_to_run)
+            job_status = [j.status for j in all_ordered_jobs]
+            n_pending = len([s for s in job_status if s == PypedreamStatus.PENDING])
+            n_done_current = len([s for s in job_status if s == PypedreamStatus.COMPLETED])
+            n_failed_current = len([s for s in job_status if s == PypedreamStatus.FAILED])
+            n_running = len(all_ordered_jobs) - n_pending - n_done_current - n_failed_current
 
-                if n_done == len(all_ordered_jobs):
-                    break
+            if n_done_current > n_done or n_failed_current > n_failed:
+                n_done = n_done_current
+                n_failed = n_failed_current
+                if n_failed_current > 0:
+                    jf = [j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED]
+                    print [j.jobid for j in jf]
+                logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-            pipeline.cleanup()
+        self.pipeline.cleanup()
+        if n_failed > 0:
+            raise OSError
+
+    def update_job_status(self):
+        for localqjob in self.server.get_ordered_jobs():
+            pypedreamjob = self.pipeline.get_job_with_id(localqjob.jobid)
+            pypedreamjob.status = localqjob.status()
+            if pypedreamjob.status == PypedreamStatus.COMPLETED:
+                pypedreamjob.complete()
+            elif pypedreamjob.status == PypedreamStatus.FAILED:
+                pypedreamjob.fail()
 
     def get_job_stats(self):
         return [j.info_dict() for j in self.server.graph.nodes()]

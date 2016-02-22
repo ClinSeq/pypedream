@@ -20,6 +20,7 @@ class Job:
         self.is_intermediate = False
         self.status = PypedreamStatus.PENDING
         self.jobid = None
+        self.data = {}  # any additional data that the runner needs a job to keep track of
 
     def command(self):
         raise NotImplementedError("Class %s doesn't implement run()" % self.__class__.__name__)
@@ -81,8 +82,18 @@ class Job:
     def __str__(self):
         return self.get_name
 
+    def try_remove_failfile(self):
+        for varname in self.__dict__:
+            if varname.startswith(constants.OUTPUT):
+                o = self.__dict__[varname]  # a output_nn cannot be a list
+                odir = os.path.dirname(o)
+                obase = os.path.basename(o)
+                if os.path.exists(odir + "/." + obase + ".fail"):
+                    os.remove(odir + "/." + obase + ".fail")
+
     def complete(self):
         self.status = PypedreamStatus.COMPLETED
+        self.try_remove_failfile()
         for varname in self.__dict__:
             if varname.startswith(constants.OUTPUT):
                 o = self.__dict__[varname]  # a output_nn cannot be a list
@@ -91,6 +102,7 @@ class Job:
                 touch(odir + "/." + obase + ".done")
 
     def fail(self):
+        self.status = PypedreamStatus.FAILED
         for varname in self.__dict__:
             if varname.startswith(constants.OUTPUT):
                 o = self.__dict__[varname]  # a output_nn cannot be a list
@@ -100,7 +112,6 @@ class Job:
                 if os.path.exists(odir + "/." + obase + ".done"):
                     os.remove(odir + "/." + obase + ".done")
 
-        self.status = PypedreamStatus.FAILED
 
     def all_donefiles_exists(self):
         donefiles_exist = True
@@ -140,18 +151,6 @@ class Job:
 
         f.write(self.command())
 
-        for varname in self.__dict__:
-            if varname.startswith(constants.INPUT):
-                obj = self.__dict__[varname]  # can be a list or a string
-                if obj.__class__.__name__ == "str":
-                    fname = obj
-                    pass
-
-                elif obj.__class__.__name__ == "list":
-                    for fname in obj:
-                        pass
-
-        f.write('\n')
         f.write('\n')
         f.close()
 

@@ -58,6 +58,7 @@ class Localqrunner(Runner):
             raise OSError
 
         signal.signal(signal.SIGINT, capture_sigint)
+        signal.signal(signal.SIGTERM, capture_sigint)
 
         logging.info("Starting")
         time.sleep(2)

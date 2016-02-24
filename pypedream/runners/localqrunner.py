@@ -1,7 +1,6 @@
 import logging
 import time
 import datetime
-
 import sys
 from click import progressbar
 from localq.localQ_server import LocalQServer
@@ -62,7 +61,23 @@ class Localqrunner(Runner):
         logging.info("Pipeline starting with {} jobs.".format(len(all_ordered_jobs)))
         logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-        while self.server.get_runnable_jobs():
+        def is_done(server):
+            """
+            Logic to tell if a server has finished.
+            :param server:
+            :return:
+            """
+            if server.get_runnable_jobs():
+                # if there are still jobs that can run, we're not done
+                return False
+            elif Status.RUNNING in server.get_status_all().values():
+                # if any jobs are running, we're not done
+                return False
+            else:
+                # otherwise, we're done!
+                return True
+
+        while not is_done(self.server):
             time.sleep(1)
             self.update_job_status()
 
@@ -81,8 +96,23 @@ class Localqrunner(Runner):
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
         self.pipeline.cleanup()
+
+        job_status = [j.status for j in all_ordered_jobs]
+
+        logging.debug("Runnable jobs: {}".format([j.name for j in self.server.get_runnable_jobs()]))
+        n_failed = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED])
+
         if n_failed > 0:
-            raise OSError
+            return -1
+
+        return 0
+
+    def get_job_statys(self):
+        job_status = [j.status for j in self.pipeline.get_ordered_jobs()]
+        n_pending = len([s for s in job_status if s == PypedreamStatus.PENDING])
+        n_done = len([s for s in job_status if s == PypedreamStatus.COMPLETED])
+        n_failed = len([s for s in job_status if s == PypedreamStatus.FAILED])
+        n_running = len([s for s in job_status if s == PypedreamStatus.RUNNING])
 
     def update_job_status(self):
         for localqjob in self.server.get_ordered_jobs():

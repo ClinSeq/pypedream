@@ -41,7 +41,7 @@ class Shellrunner(runner.Runner):
                     logging.error(f.read())
                     f.close()
                     job.fail()
-                    raise OSError
+                    return returncode
                 else:
                     job.complete()
 
@@ -49,4 +49,4 @@ class Shellrunner(runner.Runner):
 
                 logfile.close()
 
-        return True
+        return 0

@@ -2,6 +2,7 @@ import logging
 import time
 import datetime
 import sys
+import signal
 from click import progressbar
 from localq.localQ_server import LocalQServer
 from localq.status import Status
@@ -34,10 +35,33 @@ class Localqrunner(Runner):
         :type pipeline: PypedreamPipeline
         :return:
         """
+
         self.pipeline = pipeline
         self.server = LocalQServer(num_cores_available=self.threads, interval=0.1)
         ordered_jobs_to_run = self.pipeline.get_ordered_jobs_to_run()
         all_ordered_jobs = self.pipeline.get_ordered_jobs()
+
+        def capture_sigint(sig, frame):
+            """
+            Capture ctrl-c (or SIGINT sent in other ways).
+            1. update remote log
+            :param sig:
+            :param frame:
+            :return:
+            """
+            logging.error("Killing running jobs...")
+            self.server.stop_all_jobs()
+            for pypedreamjob in [j for j in ordered_jobs_to_run if j.status == PypedreamStatus.RUNNING]:
+                pypedreamjob.fail()
+
+            logging.error("Done.")
+            raise OSError
+
+        signal.signal(signal.SIGINT, capture_sigint)
+
+        logging.info("Starting")
+        time.sleep(2)
+
         for job in ordered_jobs_to_run:
             depjobs = self.pipeline.get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j.status != PypedreamStatus.COMPLETED]

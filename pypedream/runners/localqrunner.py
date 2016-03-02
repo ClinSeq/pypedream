@@ -66,7 +66,7 @@ class Localqrunner(Runner):
         for job in ordered_jobs_to_run:
             depjobs = self.pipeline.get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j.status != PypedreamStatus.COMPLETED]
-            job.try_remove_failfile()
+            # job.try_remove_files(job.failfiles())
             # sys.stderr.write("job wants {} cores\n".format(job.threads))
 
             job.jobid = self.server.add_script(job.script, job.threads, stdout=job.log, stderr=job.log,
@@ -120,6 +120,8 @@ class Localqrunner(Runner):
                     print [j.jobid for j in jf]
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
+
+
         self.pipeline.cleanup()
 
         job_status = [j.status for j in all_ordered_jobs]
@@ -132,7 +134,7 @@ class Localqrunner(Runner):
 
         return 0
 
-    def get_job_statys(self):
+    def get_job_status(self):
         job_status = [j.status for j in self.pipeline.get_ordered_jobs()]
         n_pending = len([s for s in job_status if s == PypedreamStatus.PENDING])
         n_done = len([s for s in job_status if s == PypedreamStatus.COMPLETED])
@@ -144,8 +146,12 @@ class Localqrunner(Runner):
             pypedreamjob = self.pipeline.get_job_with_id(localqjob.jobid)
             pypedreamjob.status = localqjob.status()
             if pypedreamjob.status == PypedreamStatus.COMPLETED:
+                #pypedreamjob.try_remove_files(pypedreamjob.failfiles())
+                #pypedreamjob.touch_files(pypedreamjob.donefiles())
                 pypedreamjob.complete()
             elif pypedreamjob.status == PypedreamStatus.FAILED:
+                #pypedreamjob.try_remove_files(pypedreamjob.donefiles())
+                #pypedreamjob.touch_files(pypedreamjob.failfiles())
                 pypedreamjob.fail()
 
     def get_job_stats(self):

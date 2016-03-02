@@ -41,6 +41,11 @@ class PypedreamPipeline:
         logging.debug("  outputs: " + str(outputs))
         job.set_log()
         logging.debug("Will write log to {}".format(job.log))
+        logging.debug("inputs are: {}".format(job.get_inputs()))
+        logging.debug("outputs are: {}".format(job.get_outputs()))
+        logging.debug("donefiles are: {}".format(job.donefiles()))
+        logging.debug("failfiles are: {}".format(job.failfiles()))
+
         if job.all_donefiles_exists():
             job.status = PypedreamStatus.COMPLETED
 

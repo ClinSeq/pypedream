@@ -17,7 +17,8 @@ class Slurmrunner(runner.Runner):
         ordered_jobs = pipeline.get_ordered_jobs_to_run()
 
         for job in ordered_jobs:
-            depjobids = [t.jobid for t in job.dependencies]
+            depjobs = self.pipeline.get_dependencies(job)
+            depjobids = [j.jobid for j in depjobs]
             if depjobids:
                 depstring = "--dependency=afterok:" + ":".join(str(j) for j in depjobids)  # join job ids and stringify
             else:

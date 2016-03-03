@@ -10,9 +10,10 @@ walltime = "12:00:00"  # default to 12 hours
 
 class Slurmrunner(runner.Runner):
     def __init__(self):
-        pass
+        self.pipeline = None
 
     def run(self, pipeline):
+        self.pipeline = pipeline
         self.checkSlurmVersion()
         ordered_jobs = pipeline.get_ordered_jobs_to_run()
 

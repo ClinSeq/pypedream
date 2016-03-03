@@ -1,35 +1,34 @@
+import logging
+import subprocess
+import re
 import runner
 
 __author__ = 'dankle'
 
-import sys
-import subprocess
-import re
-
-jobnamePrefix = "pypedream."
+walltime = "12:00:00"  # default to 12 hours
 
 
 class Slurmrunner(runner.Runner):
+    def __init__(self):
+        pass
+
     def run(self, pipeline):
-        if not pipeline.account:
-            print "Slurm required parameter account (\"-A\") not set."
-            sys.exit(1)
         self.checkSlurmVersion()
-        ordered_tasks = pipeline.getOrderedTasks()
-        for task in ordered_tasks:
-            jobname = jobnamePrefix + task.taskname.encode("utf8")  # reencode to remove u prefix)
-            depjobids = [t.jobid for t in task.dependencies]
+        ordered_jobs = pipeline.get_ordered_jobs_to_run()
+
+        for job in ordered_jobs:
+            depjobids = [t.jobid for t in job.dependencies]
             if depjobids:
                 depstring = "--dependency=afterok:" + ":".join(str(j) for j in depjobids)  # join job ids and stringify
             else:
                 depstring = ""
             cmd = ["sbatch"]
-            cmd = cmd + ["-J", jobname]
-            cmd = cmd + ["-t", task.walltime]
-            cmd = cmd + ["-A", pipeline.account]
-            cmd = cmd + ["-o", task.log]
+            cmd = cmd + ["-J", job.get_name()]
+            cmd = cmd + ["-t", walltime]
+            cmd = cmd + ["-n", job.threads]
+            cmd = cmd + ["-o", job.log]
             cmd = cmd + [depstring]
-            cmd = cmd + [task.script]
+            cmd = cmd + [job.script]
             cmd = filter(None, cmd)  # removes empty elements from the list
 
             print "Submitting job with command: " + str(cmd)
@@ -38,21 +37,14 @@ class Slurmrunner(runner.Runner):
             m = re.search("\d+", msg)
             jobid = m.group()
             print "Submitted job with id " + str(jobid)
-            task.jobid = jobid
+            job.jobid = jobid
 
     def checkSlurmVersion(self):
         cmd = ["sbatch", "--version"]
         try:
             p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             msg = p.communicate()
-            print "Found Slurm: " + str(msg)
+            logging.debug("Found Slurm: {}".format(msg))
         except OSError:
-            print "SLURM (sbatch) not found in system path. Quitting"
-            sys.exit(1)
+            raise OSError("SLURM (sbatch) not found in system path. Quitting")
 
-
-# http://stackoverflow.com/questions/480214
-def uniq(seq):  # renamed from f7()
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]

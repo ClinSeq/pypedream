@@ -16,30 +16,31 @@ class Slurmrunner(runner.Runner):
         self.pipeline = pipeline
         self.checkSlurmVersion()
         ordered_jobs = pipeline.get_ordered_jobs_to_run()
-
+        
         for job in ordered_jobs:
             depjobs = self.pipeline.get_dependencies(job)
-            depjobids = [j.jobid for j in depjobs]
-            if depjobids:
+            depjobids = [j.jobid for j in depjobs if j in ordered_jobs]
+            if depjobids and depjobids is not []:
                 depstring = "--dependency=afterok:" + ":".join(str(j) for j in depjobids)  # join job ids and stringify
             else:
                 depstring = ""
             cmd = ["sbatch"]
             cmd = cmd + ["-J", job.get_name()]
             cmd = cmd + ["-t", walltime]
-            cmd = cmd + ["-n", job.threads]
+            cmd = cmd + ["-n", str(job.threads)]
             cmd = cmd + ["-o", job.log]
             cmd = cmd + [depstring]
             cmd = cmd + [job.script]
             cmd = filter(None, cmd)  # removes empty elements from the list
 
-            print "Submitting job with command: " + str(cmd)
+            logging.info("Submitting job with command: {}".format(cmd))
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
             msg = p.stdout.read()
             m = re.search("\d+", msg)
             jobid = m.group()
-            print "Submitted job with id " + str(jobid)
+            logging.info("Submitted job with id " + str(jobid))
             job.jobid = jobid
+        return 0
 
     def checkSlurmVersion(self):
         cmd = ["sbatch", "--version"]

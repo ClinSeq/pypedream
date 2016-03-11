@@ -202,10 +202,15 @@ def optional(param, value):  # optional("-V", argument.myvcf)
 
 
 def repeat(param, values):  # repeat("INPUT=", input.bamsToMerge)
-    retstr = ""
-    for value in values:
-        retstr += " {}{}".format(param, value)
-    return retstr + " "
+    if type(values) is not list and values is not None:
+        raise ValueError("Values must be a list. Single values must be wrapped.")
+    retitems = []
+    if values is None:
+        return ""
+    else:
+        for value in values:
+            retitems.append("{}{}".format(param, value))
+        return " {} ".format(" ".join(retitems))
 
 
 def required(param, value):  # required("-b ", self.algorithm) ==> -b bwtsw

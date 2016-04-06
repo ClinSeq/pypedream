@@ -203,6 +203,17 @@ class PypedreamPipeline:
         for job in self.graph.nodes():
             input_files = job.get_inputs()
 
+    def get_job_status_dict(self):
+        """
+        Get a dictionary with number of jobs for each status
+        :rtype: dict[PypedreamStatus, int]
+        """
+        d = {}
+        for st in [PypedreamStatus.COMPLETED, PypedreamStatus.FAILED, PypedreamStatus.PENDING,
+                   PypedreamStatus.RUNNING, PypedreamStatus.CANCELLED, PypedreamStatus.NOT_FOUND]:
+            n = len([j for j in self.get_ordered_jobs() if j.status == st])
+            d[st] = n
+        return d
 
 # http://stackoverflow.com/questions/480214
 def uniq(seq):  # renamed from f7()

@@ -15,7 +15,7 @@ def get_job_name(job):
 
 class Shellrunner(runner.Runner):
     def __init__(self):
-        pass
+        self.pipeline = None
 
     def run(self, pipeline):
         """
@@ -23,7 +23,8 @@ class Shellrunner(runner.Runner):
         :param pipeline:
         :return: True if no errors occurred, False otherwise
         """
-        ordered_jobs = pipeline.get_ordered_jobs_to_run()
+        self.pipeline = pipeline
+        ordered_jobs = self.pipeline.get_ordered_jobs_to_run()
         # ordered_jobs = pipeline.get_ordered_jobs()
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:
@@ -45,7 +46,7 @@ class Shellrunner(runner.Runner):
                 else:
                     job.complete()
 
-                pipeline.cleanup()
+                    self.pipeline.cleanup()
 
                 logfile.close()
 

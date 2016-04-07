@@ -8,7 +8,6 @@ from localq.localQ_server import LocalQServer
 from localq.status import Status
 from pypedream.runners.runner import Runner
 from pypedream.pypedreamstatus import PypedreamStatus
-from pypedream.pipeline.pypedreampipeline import PypedreamPipeline
 
 __author__ = 'dankle'
 

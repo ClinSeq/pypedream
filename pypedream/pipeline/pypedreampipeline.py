@@ -3,6 +3,10 @@ import logging
 import os
 import sys
 import networkx as nx
+from multiprocessing import Process
+
+from pypedream.runners.shellrunner import Shellrunner
+
 import pypedream.constants
 from pypedream.job import Job
 from pypedream.pypedreamstatus import PypedreamStatus
@@ -14,13 +18,24 @@ sys.path.insert(0, parentdir)
 __author__ = 'dankle'
 
 
-class PypedreamPipeline:
-    def __init__(self, scriptdir="~/.pypedream/scripts/", run=None, dot=None):
+class PypedreamPipeline(Process):
+    runner = None
+    status = None
+
+    def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner()):
+        Process.__init__(self)
         self.graph = nx.MultiDiGraph()
-        self.scriptdir = os.path.abspath(os.path.expandvars(os.path.expanduser(scriptdir)))
-        self.run = run
         self.dot = dot
-        logging.debug("instantiated a pipeline with scriptdir {}".format(self.scriptdir))
+        self.runner = runner
+        self.outdir = outdir
+
+        if not scriptdir:
+            self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
+
+        logging.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir':self.outdir,
+                                                                                  'scriptdir':self.scriptdir,
+                                                                                  'runner':self.runner.__class__,
+                                                                                  'dot': self.dot}))
 
     def add(self, job):
         """
@@ -214,6 +229,17 @@ class PypedreamPipeline:
             n = len([j for j in self.get_ordered_jobs() if j.status == st])
             d[st] = n
         return d
+
+    def run(self):
+        self.add_edges()
+        self.status = PypedreamStatus.RUNNING
+        return_code = self.runner.run(self)
+        if return_code == 0:
+            self.status = PypedreamStatus.COMPLETED
+        else:
+            self.status = PypedreamStatus.FAILED
+
+
 
 # http://stackoverflow.com/questions/480214
 def uniq(seq):  # renamed from f7()

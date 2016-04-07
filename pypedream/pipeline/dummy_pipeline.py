@@ -6,7 +6,7 @@ __author__ = 'dankle'
 
 class Pipeline(PypedreamPipeline):
     def __init__(self, outdir, first, second, third):
-        PypedreamPipeline.__init__(self)
+        PypedreamPipeline.__init__(self, outdir)
 
         rnd1 = Urandom()
         rnd1.output = outdir + "/" + first

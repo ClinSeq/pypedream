@@ -9,8 +9,9 @@ __author__ = 'dankle'
 
 
 class Runner:
+    def __init__(self):
+        pass
+
     def run(self, pipeline):
         raise NotImplementedError("Class %s doesn't implement run()" % (self.__class__.__name__))
 
-    def get_job_stats(self):
-        return None

@@ -89,16 +89,19 @@ class Slurmrunner(runner.Runner):
     @staticmethod
     def get_job_status(jobid):
         """
-        Get the status of a job. Since jobs are only added to accounting when they start, we first
-        need ot check in accounting with `sacct` if the job is there. If it's not, check in the queue
-        with `squeue`.
+        Get the status of a job.
+
+        Notes
+        * Jobs might not be in accounting when they are pending
+        * Jobs might be PENDING in accounting while they are RUNNING in the queue
+
+        therefore, first check the queue. If the job is there, use its status.
+        If it's not, check in accounting
         """
 
-        # first check in accounting
-        status_str = Slurmrunner._get_job_status_from_sacct(jobid)
-        # if it's not in accounting, check in queue
+        status_str = Slurmrunner._get_job_status_from_squeue(jobid)
         if not status_str:
-            status_str = Slurmrunner._get_job_status_from_squeue(jobid)
+            status_str = Slurmrunner._get_job_status_from_sacct(jobid)
 
         # convert string to PypedreamStatus
         status = PypedreamStatus.from_slurm(status_str)

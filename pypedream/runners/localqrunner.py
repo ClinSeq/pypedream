@@ -94,7 +94,7 @@ class Localqrunner(Runner):
                 n_failed = n_failed_current
                 if n_failed_current > 0:
                     jf = [j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED]
-                    logging.debud("Jobs {} have failed").format([j.jobid for j in jf])
+                    logging.debug("Jobs {} have failed".format([j.jobid for j in jf]))
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
             self.pipeline.cleanup()

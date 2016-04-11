@@ -1,5 +1,7 @@
 import logging
 from click import progressbar
+from pypedream.pypedreamstatus import PypedreamStatus
+
 import runner
 import subprocess
 
@@ -33,6 +35,7 @@ class Shellrunner(runner.Runner):
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
                 p = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
+                job.status = PypedreamStatus.RUNNING
                 returncode = p.wait()
                 logfile.flush()
                 if returncode != 0:
@@ -51,3 +54,7 @@ class Shellrunner(runner.Runner):
                 logfile.close()
 
         return 0
+
+    def stop_all_jobs(self):
+        # how to we stop a shellrunner?
+        pass

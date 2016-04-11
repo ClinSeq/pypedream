@@ -2,8 +2,9 @@ import inspect
 import logging
 import os
 import sys
+from threading import Thread
+
 import networkx as nx
-from multiprocessing import Process
 
 from pypedream.runners.shellrunner import Shellrunner
 
@@ -18,12 +19,13 @@ sys.path.insert(0, parentdir)
 __author__ = 'dankle'
 
 
-class PypedreamPipeline(Process):
+class PypedreamPipeline(Thread):
     runner = None
-    status = None
+    #status = None
 
     def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner()):
-        Process.__init__(self)
+        Thread.__init__(self)
+        self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
         self.dot = dot
         self.runner = runner
@@ -218,7 +220,7 @@ class PypedreamPipeline(Process):
         for job in self.graph.nodes():
             input_files = job.get_inputs()
 
-    def get_job_status_dict(self):
+    def get_job_status_dict(self, fractions=False):
         """
         Get a dictionary with number of jobs for each status
         :rtype: dict[PypedreamStatus, int]
@@ -226,20 +228,30 @@ class PypedreamPipeline(Process):
         d = {}
         for st in [PypedreamStatus.COMPLETED, PypedreamStatus.FAILED, PypedreamStatus.PENDING,
                    PypedreamStatus.RUNNING, PypedreamStatus.CANCELLED, PypedreamStatus.NOT_FOUND]:
-            n = len([j for j in self.get_ordered_jobs() if j.status == st])
+            n = len([j for j in self.graph.nodes() if j.status == st])
             d[st] = n
+        if fractions:
+            tot = sum(d.values())
+            for st in d:
+                d[st] = float(d[st])/tot
         return d
 
+    def total_jobs(self):
+        return sum(self.get_job_status_dict().values())
+
     def run(self):
-        self.add_edges()
         self.status = PypedreamStatus.RUNNING
+        self.add_edges()
         return_code = self.runner.run(self)
         if return_code == 0:
+            logging.info("Pipeline finished successfully. ")
             self.status = PypedreamStatus.COMPLETED
         else:
+            logging.info("Pipeline failed with exit code {}.".format(return_code))
             self.status = PypedreamStatus.FAILED
 
-
+    def stop_all_jobs(self):
+        self.runner.stop_all_jobs()
 
 # http://stackoverflow.com/questions/480214
 def uniq(seq):  # renamed from f7()

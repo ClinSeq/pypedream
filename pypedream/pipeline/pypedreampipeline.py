@@ -9,7 +9,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from pypedream.runners.shellrunner import Shellrunner
-
 import pypedream.constants
 from pypedream.job import Job, Base
 from pypedream.pypedreamstatus import PypedreamStatus

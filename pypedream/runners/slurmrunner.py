@@ -1,15 +1,11 @@
 import logging
-import subprocess
 import re
+import subprocess
+import sys
 import time
 
-import signal
-
-import sys
-
-from pypedream.pypedreamstatus import PypedreamStatus
-
 import runner
+from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 

@@ -1,7 +1,9 @@
 import os
 import unittest
-from pypedream import runners
+
 from pypedream.pipeline import dummy_pipeline_that_fails
+from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream.runners.localqrunner import Localqrunner
 
 
 class TestDummyPipelineThatFails(unittest.TestCase):
@@ -9,12 +11,14 @@ class TestDummyPipelineThatFails(unittest.TestCase):
 
     def test_fail_file_exists(self):
         # arrange
-        self.p = dummy_pipeline_that_fails.Pipeline("/tmp", "first", "second", "third")
-        self.p.add_edges()
-        runner = runners.localqrunner.Localqrunner(4)
+        self.p = dummy_pipeline_that_fails.FailingPipeline("/tmp", "first", "second", "third", runner=Localqrunner(4))
+
+        self.p.start()
+        self.p.join()
 
         # act, pipeline should return != 0 when failing
-        self.assertNotEqual(runner.run(self.p), 0, "Pipeline returncode should not be 0 when failing")
+        self.assertEqual(self.p.status, PypedreamStatus.FAILED,
+                         "Pipeline status should not be FAILED when failing (got {})".format(self.p.status))
 
         # assert, .fail file should be in place
         self.assertTrue(os.path.exists("/tmp/.second.fail"))

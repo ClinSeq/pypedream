@@ -4,9 +4,9 @@ from pypedream.tools.unix import Cat, Urandom, Ifail
 __author__ = 'dankle'
 
 
-class Pipeline(PypedreamPipeline):
-    def __init__(self, outdir, first, second, third):
-        PypedreamPipeline.__init__(self, outdir)
+class FailingPipeline(PypedreamPipeline):
+    def __init__(self, outdir, first, second, third, **kwargs):
+        PypedreamPipeline.__init__(self, outdir, **kwargs)
 
         rnd1 = Urandom()
         rnd1.output = outdir + "/" + first

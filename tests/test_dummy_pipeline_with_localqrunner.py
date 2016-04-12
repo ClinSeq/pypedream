@@ -2,10 +2,8 @@ import os
 import tempfile
 import unittest
 
-import sys
-
-from pypedream import runners
-from pypedream.pipeline import dummy_pipeline
+from pypedream.pipeline.dummy_pipeline import TestPipeline
+from pypedream.runners.localqrunner import Localqrunner
 
 
 class TestDummyPipeline(unittest.TestCase):
@@ -14,16 +12,16 @@ class TestDummyPipeline(unittest.TestCase):
 
     def setUp(self):
         self.outdir = tempfile.mkdtemp()
-        #sys.stderr.write(self.outdir + "\n")
-        self.p = dummy_pipeline.Pipeline(self.outdir, "first", "second", "third")
-        self.p.add_edges()
-        runner = runners.localqrunner.Localqrunner(2)
-        runner.run(self.p)
+        self.p = TestPipeline(self.outdir, "first-localq", "second-localq", "third-localq",
+                              runner=Localqrunner(2), jobdb=":memory:")
+
+        self.p.start()
+        self.p.join()
 
     def test_output_exists(self):
-        self.assertTrue(os.path.exists(self.outdir+"/third"))
-        self.assertTrue(os.path.exists(self.outdir+"/.third.done"))
+        self.assertTrue(os.path.exists(self.outdir + "/third-localq"))
+        self.assertTrue(os.path.exists(self.outdir + "/.third-localq.done"))
 
     def test_intermediate_is_deleted(self):
-        self.assertTrue(not os.path.exists(self.outdir+"/second"))
-        self.assertTrue(os.path.exists(self.outdir+"/third"))
+        self.assertTrue(not os.path.exists(self.outdir + "/second-localq"))
+        self.assertTrue(os.path.exists(self.outdir + "/third-localq"))

@@ -4,8 +4,10 @@ import unittest
 
 import sys
 
+from pypedream.runners.shellrunner import Shellrunner
+
 from pypedream import runners
-from pypedream.pipeline import dummy_pipeline
+from pypedream.pipeline.dummy_pipeline import TestPipeline
 
 
 class TestDummyPipeline(unittest.TestCase):
@@ -14,16 +16,16 @@ class TestDummyPipeline(unittest.TestCase):
 
     def setUp(self):
         self.outdir = tempfile.mkdtemp()
-        #sys.stderr.write(self.outdir + "\n")
-        self.p = dummy_pipeline.Pipeline(self.outdir, "first", "second", "third")
-        self.p.add_edges()
-        runner = runners.shellrunner.Shellrunner()
-        runner.run(self.p)
+        self.p = TestPipeline(self.outdir, "first", "second", "third",
+                              jobdb=":memory:", runner=Shellrunner())
+
+        self.p.start()
+        self.p.join()
 
     def test_output_exists(self):
-        self.assertTrue(os.path.exists(self.outdir+"/third"))
-        self.assertTrue(os.path.exists(self.outdir+"/.third.done"))
+        self.assertTrue(os.path.exists(self.outdir + "/third"))
+        self.assertTrue(os.path.exists(self.outdir + "/.third.done"))
 
     def test_intermediate_is_deleted(self):
-        self.assertTrue(not os.path.exists(self.outdir+"/second"))
-        self.assertTrue(os.path.exists(self.outdir+"/third"))
+        self.assertTrue(not os.path.exists(self.outdir + "/second"))
+        self.assertTrue(os.path.exists(self.outdir + "/third"))

@@ -1,15 +1,25 @@
 import logging
 import os
 import uuid
+
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
 from pypedream import constants
 from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 
+Base = declarative_base()
 
-class Job:
+
+class Job(Base):
     """ A abstract class of a tool
     """
+    __tablename__ = "jobs"
+    backendid = Column(Integer, primary_key=True)
+    jobid = Column(Integer)
+    name = Column(String)
+    status = Column(String)
 
     def __init__(self):
         self.script = None
@@ -66,16 +76,10 @@ class Job:
 
     def __hash__(self):
         """
-        Custom hash function. Use all items in class except for log and script.
-        :return: hash if object
+        What makes a job unique is it's inputs and outputs, so hash a list of that.
+        :return: hash of object
         """
-        items_to_exclude = ["script", "log", 'is_intermediate', 'status']
-        items = self.__dict__.items()
-        items_to_hash = dict()
-        for item in items:
-            if not item[0] in items_to_exclude:
-                items_to_hash[item[0]] = item[1]
-        return hash(str(items_to_hash))
+        return hash(str([self.get_inputs(), self.get_outputs()]))
 
     def __str__(self):
         return self.get_name
@@ -93,13 +97,13 @@ class Job:
 
     def complete(self):
         self.status = PypedreamStatus.COMPLETED
-        #self.try_remove_files(self.failfiles())
-        #self.touch_files(self.donefiles())
+        # self.try_remove_files(self.failfiles())
+        # self.touch_files(self.donefiles())
 
     def fail(self):
         self.status = PypedreamStatus.FAILED
-        #self.try_remove_files(self.donefiles())
-        #self.touch_files(self.failfiles())
+        # self.try_remove_files(self.donefiles())
+        # self.touch_files(self.failfiles())
 
     def donefiles(self):
         donefiles = []
@@ -137,8 +141,8 @@ class Job:
 
         f = open(self.script, 'w')
         f.write("#!/usr/bin/env bash\n")
-        #f.write("set -euo pipefail\n")
-        #f.write("set -eu\n")
+        # f.write("set -euo pipefail\n")
+        # f.write("set -eu\n")
         f.write("\n")
 
         # create directories for output files
@@ -154,9 +158,9 @@ class Job:
         f.write("OUT=$?\n")
         f.write("\n")
         f.write("if [ $OUT -eq 0 ];then\n")  # success
-        f.write(self.complete_bash()+"\n")
+        f.write(self.complete_bash() + "\n")
         f.write("else\n")
-        f.write(self.fail_bash()+"\n")  # fail
+        f.write(self.fail_bash() + "\n")  # fail
         f.write("fi\n")
         f.write("\n")
         f.write("exit $OUT\n")

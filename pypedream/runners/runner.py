@@ -19,5 +19,9 @@ class Runner(object):
         pass
 
     @abc.abstractmethod
+    def get_job_status(self, jobid):
+        pass
+
+    @abc.abstractmethod
     def stop_all_jobs(self):
         pass

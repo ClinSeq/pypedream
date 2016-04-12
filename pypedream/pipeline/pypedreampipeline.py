@@ -5,11 +5,13 @@ import sys
 from threading import Thread
 
 import networkx as nx
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from pypedream.runners.shellrunner import Shellrunner
 
 import pypedream.constants
-from pypedream.job import Job
+from pypedream.job import Job, Base
 from pypedream.pypedreamstatus import PypedreamStatus
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -21,23 +23,36 @@ __author__ = 'dankle'
 
 class PypedreamPipeline(Thread):
     runner = None
-    #status = None
 
-    def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner()):
+    # status = None
+
+    def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner(), jobdb=None):
         Thread.__init__(self)
         self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
         self.dot = dot
         self.runner = runner
         self.outdir = outdir
+        self.jobdb = jobdb
+        self.session = None
 
         if not scriptdir:
             self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
 
-        logging.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir':self.outdir,
-                                                                                  'scriptdir':self.scriptdir,
-                                                                                  'runner':self.runner.__class__,
+        self.setup_db()
+
+        logging.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
+                                                                                  'scriptdir': self.scriptdir,
+                                                                                  'runner': self.runner.__class__,
                                                                                   'dot': self.dot}))
+
+    def setup_db(self):
+        if self.jobdb:
+            engine = create_engine("sqlite:///{}".format(self.jobdb), echo=True)
+            Base.metadata.create_all(engine)
+            Session = sessionmaker()
+            Session.configure(bind=engine)
+            self.session = Session()
 
     def add(self, job):
         """
@@ -67,6 +82,11 @@ class PypedreamPipeline(Thread):
             job.status = PypedreamStatus.COMPLETED
 
         self.graph.add_node(job)
+        job.name = job.get_name()
+
+        if self.session:
+            self.session.add(job)
+            self.session.commit()
 
     def add_edges(self):
         filenames = self.get_all_files()
@@ -76,8 +96,13 @@ class PypedreamPipeline(Thread):
             if inputs and outputs:
                 for i in inputs:
                     for o in outputs:
+                        if i not in self.graph.nodes():
+                            raise ValueError("input node {} is not in graph".format(i))
+                        if o not in self.graph.nodes():
+                            raise ValueError("output node {} is not in graph".format(o))
                         logging.debug(
                             "Adding edge from " + o.get_name() + " to " + i.get_name() + " with name " + fname)
+
                         self.graph.add_edges_from([(o, i)], filename=fname)
 
         self.write_scripts()
@@ -233,7 +258,7 @@ class PypedreamPipeline(Thread):
         if fractions:
             tot = sum(d.values())
             for st in d:
-                d[st] = float(d[st])/tot
+                d[st] = float(d[st]) / tot
         return d
 
     def total_jobs(self):
@@ -252,6 +277,7 @@ class PypedreamPipeline(Thread):
 
     def stop_all_jobs(self):
         self.runner.stop_all_jobs()
+
 
 # http://stackoverflow.com/questions/480214
 def uniq(seq):  # renamed from f7()

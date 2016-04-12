@@ -5,6 +5,8 @@ import time
 
 import signal
 
+import sys
+
 from pypedream.pypedreamstatus import PypedreamStatus
 
 import runner
@@ -16,6 +18,9 @@ walltime = "12:00:00"  # default to 12 hours
 
 class Slurmrunner(runner.Runner):
     def __init__(self):
+        """
+        Run jobs on a slurm cluster.
+        """
         self.pipeline = None
         self.ordered_jobs = None
 
@@ -24,58 +29,51 @@ class Slurmrunner(runner.Runner):
         self.checkSlurmVersion()
         self.ordered_jobs = pipeline.get_ordered_jobs_to_run()
 
-        try:
+        #try:
+        for job in self.ordered_jobs:
+            depjobs = self.pipeline.get_dependencies(job)
+            depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
+            if depjobids and depjobids is not []:
+                depstring = "--dependency=afterok:" + ":".join(
+                    str(j) for j in depjobids)  # join job ids and stringify
+            else:
+                depstring = ""
+            cmd = ["sbatch"]
+            cmd = cmd + ["-J", job.get_name()]
+            cmd = cmd + ["-t", walltime]
+            cmd = cmd + ["-n", str(job.threads)]
+            cmd = cmd + ["-o", job.log]
+            cmd = cmd + [depstring]
+            cmd = cmd + [job.script]
+            cmd = filter(None, cmd)  # removes empty elements from the list
+
+            logging.debug("Submitting job with command: {}".format(cmd))
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            msg = p.stdout.read()
+            m = re.search("\d+", msg)
+            jobid = m.group()
+            logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
+            job.jobid = jobid
+
+        while not self.is_done():
+            time.sleep(1)
+
             for job in self.ordered_jobs:
-                depjobs = self.pipeline.get_dependencies(job)
-                depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
-                if depjobids and depjobids is not []:
-                    depstring = "--dependency=afterok:" + ":".join(str(j) for j in depjobids)  # join job ids and stringify
-                else:
-                    depstring = ""
-                cmd = ["sbatch"]
-                cmd = cmd + ["-J", job.get_name()]
-                cmd = cmd + ["-t", walltime]
-                cmd = cmd + ["-n", str(job.threads)]
-                cmd = cmd + ["-o", job.log]
-                cmd = cmd + [depstring]
-                cmd = cmd + [job.script]
-                cmd = filter(None, cmd)  # removes empty elements from the list
+                if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
+                    job.status = self.get_job_status(job.jobid)
+            if self.pipeline.session:
+                self.pipeline.session.commit()
 
-                logging.debug("Submitting job with command: {}".format(cmd))
-                p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-                msg = p.stdout.read()
-                m = re.search("\d+", msg)
-                jobid = m.group()
-                logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
-                job.jobid = jobid
+            self.pipeline.cleanup()
 
-            while True:
-                time.sleep(5)
-                logging.info("Status of jobs are {}".format(self.pipeline.get_job_status_dict()))
-
-                for job in self.pipeline.graph.nodes():
-                    n_jobs_to_wait_for = 0
-                    if job.status == PypedreamStatus.COMPLETED:
-                        job.complete()
-                    elif job.status == PypedreamStatus.FAILED or \
-                                    job.status == PypedreamStatus.CANCELLED or \
-                                    job.status == PypedreamStatus.NOT_FOUND:
-                        job.fail()
-                    else:
-                        n_jobs_to_wait_for += 1
-
-                self.pipeline.cleanup()
-
-                if n_jobs_to_wait_for == 0:
-                    break
-
-        except Exception:
-            self.stop_all_jobs()
-            return 1
+        # except Exception:
+        #     self.stop_all_jobs()
+        #     return 1
 
         self.pipeline.cleanup()
 
         d = self.pipeline.get_job_status_dict()
+        print >>sys.stderr, "jobs status is {}".format(d)
         return_code = d[PypedreamStatus.FAILED] + d[PypedreamStatus.CANCELLED]
         return return_code
 
@@ -86,8 +84,7 @@ class Slurmrunner(runner.Runner):
             subprocess.check_output(['scancel', str(job.jobid)])
         self.pipeline.status = PypedreamStatus.FAILED
 
-    @staticmethod
-    def get_job_status(jobid):
+    def get_job_status(self, jobid):
         """
         Get the status of a job.
 
@@ -170,3 +167,42 @@ class Slurmrunner(runner.Runner):
             logging.debug("Found Slurm: {}".format(msg))
         except OSError:
             raise OSError("SLURM (sbatch) not found in system path. Quitting")
+
+    def get_runnable_jobs(self):
+        """
+        Get a list of pending jobs that are ready to be run based on dependencies
+        :return: List of Jobs
+        """
+        pending_jobs = [j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING]
+        ready_jobs = []
+        for job in pending_jobs:
+            depjobs = self.pipeline.get_dependencies(job)
+            depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
+
+            # if there are no dependencies, the job is always ready
+            if not depjobids:
+                ready_jobs.append(job)
+            else:
+                # get a list containing the status of all dependencies
+                dependency_status = [self.get_job_status(depid) for depid in depjobids]
+                # if a uniqiefied list contains a single element, and that element is "COMPLETED"
+                # then the job is ready
+                if len(set(dependency_status)) == 1 and dependency_status[0] == PypedreamStatus.COMPLETED:
+                    ready_jobs.append(job)
+        return ready_jobs
+
+    def is_done(self):
+        """
+        Logic to tell if a server has finished.
+        :param server:
+        :return:
+        """
+        if self.get_runnable_jobs():
+            # if there are still jobs that can run, we're not done
+            return False
+        elif PypedreamStatus.RUNNING in [j.status for j in self.ordered_jobs]:
+            # if any jobs are running, we're not done
+            return False
+        else:
+            # otherwise, we're done!
+            return True

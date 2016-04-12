@@ -1,13 +1,12 @@
+import datetime
 import logging
 import time
-import datetime
-import sys
-import signal
-from click import progressbar
+
 from localq.localQ_server import LocalQServer
 from localq.status import Status
-from pypedream.runners.runner import Runner
+
 from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream.runners.runner import Runner
 
 __author__ = 'dankle'
 

@@ -2,17 +2,16 @@ import inspect
 import logging
 import os
 import sys
-from threading import Thread
+from multiprocessing import Process
 
 import networkx as nx
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from pypedream.runners.shellrunner import Shellrunner
-
 import pypedream.constants
 from pypedream.job import Job, Base
 from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream.runners.shellrunner import Shellrunner
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
@@ -21,13 +20,13 @@ sys.path.insert(0, parentdir)
 __author__ = 'dankle'
 
 
-class PypedreamPipeline(Thread):
+class PypedreamPipeline(Process):
     runner = None
 
     # status = None
 
     def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner(), jobdb=None):
-        Thread.__init__(self)
+        Process.__init__(self)
         self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
         self.dot = dot
@@ -48,7 +47,8 @@ class PypedreamPipeline(Thread):
 
     def setup_db(self):
         if self.jobdb:
-            engine = create_engine("sqlite:///{}".format(self.jobdb), echo=True)
+            conn_str = 'sqlite:///{}'.format(self.jobdb)
+            engine = create_engine(conn_str, echo=True)
             Base.metadata.create_all(engine)
             Session = sessionmaker()
             Session.configure(bind=engine)
@@ -274,6 +274,7 @@ class PypedreamPipeline(Thread):
         else:
             logging.info("Pipeline failed with exit code {}.".format(return_code))
             self.status = PypedreamStatus.FAILED
+            sys.exit(1)
 
     def stop_all_jobs(self):
         self.runner.stop_all_jobs()

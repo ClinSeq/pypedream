@@ -1,11 +1,10 @@
 import logging
+import subprocess
 
-import sys
 from click import progressbar
-from pypedream.pypedreamstatus import PypedreamStatus
 
 import runner
-import subprocess
+from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 

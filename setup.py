@@ -8,7 +8,7 @@ install_reqs = parse_requirements("requirements.txt", session=False)
 reqs = [str(ir.req) for ir in install_reqs if ir.req is not None]
 
 setup(name='pypedream',
-      version='0.4.4',
+      version='0.4.5',
       packages=['pypedream', 'pypedream.pipeline', 'pypedream.runners', 'pypedream.tools'],
       install_requires=reqs
       )

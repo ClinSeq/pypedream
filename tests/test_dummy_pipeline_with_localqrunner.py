@@ -13,7 +13,7 @@ class TestDummyPipeline(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp()
         self.p = TestPipeline(self.outdir, "first-localq", "second-localq", "third-localq",
-                              runner=Localqrunner(2), jobdb=":memory:")
+                              runner=Localqrunner(2), jobdb="{}/jobs.db".format(self.outdir))
 
         self.p.start()
         self.p.join()

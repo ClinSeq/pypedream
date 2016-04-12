@@ -17,7 +17,7 @@ class TestDummyPipeline(unittest.TestCase):
     def setUp(self):
         self.outdir = tempfile.mkdtemp()
         self.p = TestPipeline(self.outdir, "first", "second", "third",
-                              jobdb=":memory:", runner=Shellrunner())
+                              jobdb="{}/jobs.db".format(self.outdir), runner=Shellrunner())
 
         self.p.start()
         self.p.join()

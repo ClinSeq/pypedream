@@ -5,6 +5,7 @@ import sys
 import time
 
 import runner
+from pypedream.job import Job
 from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
@@ -13,12 +14,13 @@ walltime = "12:00:00"  # default to 12 hours
 
 
 class Slurmrunner(runner.Runner):
-    def __init__(self):
+    def __init__(self, interval=30):
         """
         Run jobs on a slurm cluster.
         """
         self.pipeline = None
         self.ordered_jobs = None
+        self.interval = interval
 
     def run(self, pipeline):
         self.pipeline = pipeline
@@ -52,11 +54,12 @@ class Slurmrunner(runner.Runner):
             job.jobid = jobid
 
         while not self.is_done():
-            time.sleep(1)
+            time.sleep(self.interval)
 
             for job in self.ordered_jobs:
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
-                    job.status = self.get_job_status(job.jobid)
+                    newjobobj = Job.query.filter_by(jobid=jobid).first()
+                    newjobobj.status = self.get_job_status(job.jobid)
             if self.pipeline.session:
                 self.pipeline.session.commit()
 

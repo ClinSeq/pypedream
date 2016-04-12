@@ -22,8 +22,8 @@ class TestDummyPipelineThatFails(unittest.TestCase):
         runner = runners.shellrunner.Shellrunner()
 
         # act, pipeline should return != 0 when failing
-        self.assertEqual(self.p.status, PypedreamStatus.FAILED,
-                         'Pipeline status should not be FAILED when failing (got {})'.format(self.p.status))
+        self.assertNotEqual(self.p.exitcode, 0,
+                            'Pipeline exitcode should be non-zero when failing (got {})'.format(self.p.exitcode))
 
         # assert, .fail file should be in place
         self.assertTrue(os.path.exists("/tmp/.second.fail"))

@@ -16,7 +16,8 @@ class TestDummyPipeline(unittest.TestCase):
         self.outdir = tempfile.mkdtemp()
         print sys.stderr, "Testing with Slurmrunner"
         self.p = TestPipeline(self.outdir, "first-slurm", "second-slurm", "third-slurm",
-                              runner=Slurmrunner(), jobdb=":memory:")
+                              runner=Slurmrunner(interval=1),
+                              jobdb="{}/jobs.db".format(self.outdir))
 
         print sys.stderr, "Starting"
         self.p.start()

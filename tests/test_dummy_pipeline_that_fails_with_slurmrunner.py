@@ -1,8 +1,8 @@
 import os
+import tempfile
 import unittest
 
-from pypedream.pipeline import dummy_pipeline_that_fails
-from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream.pipeline.dummy_pipeline_that_fails import FailingPipeline
 from pypedream.runners.slurmrunner import Slurmrunner
 
 
@@ -11,16 +11,17 @@ class TestDummyPipelineThatFails(unittest.TestCase):
 
     def test_fail_file_exists(self):
         # arrange
-        self.p = dummy_pipeline_that_fails.FailingPipeline("/tmp", "first-slurm-testfail", "second-slurm-testfail",
-                                                           "third-slurm-testfail", runner=Slurmrunner(),
-                                                           jobdb=":memory:")
+        outdir = tempfile.mkdtemp()
+        self.p = FailingPipeline(outdir, "first-slurm-testfail", "second-slurm-testfail",
+                                                           "third-slurm-testfail", runner=Slurmrunner(interval=1),
+                                                           jobdb="{}/jobs.db".format(outdir))
 
         self.p.start()
         self.p.join()
 
         # act, pipeline should return != 0 when failing
-        self.assertEqual(self.p.status, PypedreamStatus.FAILED,
-                         "Pipeline status should not be FAILED when failing (got {})".format(self.p.status))
+        self.assertNotEqual(self.p.exitcode, 0,
+                            "Pipeline exitcode should not be non-zero when failing (got {})".format(self.p.exitcode))
 
         # assert, .fail file should be in place
         self.assertTrue(os.path.exists("/tmp/.second-slurm-testfail.fail"))

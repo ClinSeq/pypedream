@@ -40,6 +40,7 @@ class Shellrunner(runner.Runner):
                 job.status = PypedreamStatus.RUNNING
 
                 if self.pipeline.session:
+                    self.pipeline.session.add(job)
                     self.pipeline.session.commit()
 
                 returncode = proc.wait()

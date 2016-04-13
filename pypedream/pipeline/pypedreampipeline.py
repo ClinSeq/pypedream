@@ -48,7 +48,7 @@ class PypedreamPipeline(Process):
     def setup_db(self):
         if self.jobdb:
             conn_str = 'sqlite:///{}'.format(self.jobdb)
-	    engine = create_engine(conn_str, echo=False)
+            engine = create_engine(conn_str, echo=False)
             Base.metadata.create_all(engine)
             Session = sessionmaker()
             Session.configure(bind=engine)
@@ -83,10 +83,6 @@ class PypedreamPipeline(Process):
 
         self.graph.add_node(job)
         job.name = job.get_name()
-
-        if self.session:
-            self.session.add(job)
-            self.session.commit()
 
     def add_edges(self):
         filenames = self.get_all_files()

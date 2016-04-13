@@ -53,13 +53,19 @@ class Slurmrunner(runner.Runner):
             logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
+            if self.pipeline.session:
+                self.pipeline.session.add(job)
+
+        if self.pipeline.session:
+            self.pipeline.session.commit()
+
         while not self.is_done():
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
-                    newjobobj = Job.query.filter_by(jobid=jobid).first()
-                    newjobobj.status = self.get_job_status(job.jobid)
+                    #newjobobj = Job.query.filter_by(jobid=jobid).first()
+                    job.status = self.get_job_status(job.jobid)
             if self.pipeline.session:
                 self.pipeline.session.commit()
 

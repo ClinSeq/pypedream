@@ -53,6 +53,9 @@ class Localqrunner(Runner):
                     "Job {} could not be submitted with {} requested cores. {} cores available on the localq server.".format(
                         job.get_name(), job.threads, self.server.num_cores_available))
 
+            if self.pipeline.session:
+                self.pipeline.session.add(job)
+
         if self.pipeline.session:
             self.pipeline.session.commit()
 

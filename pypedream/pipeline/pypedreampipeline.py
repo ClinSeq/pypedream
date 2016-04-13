@@ -48,7 +48,7 @@ class PypedreamPipeline(Process):
     def setup_db(self):
         if self.jobdb:
             conn_str = 'sqlite:///{}'.format(self.jobdb)
-            engine = create_engine(conn_str, echo=True)
+	    engine = create_engine(conn_str, echo=False)
             Base.metadata.create_all(engine)
             Session = sessionmaker()
             Session.configure(bind=engine)

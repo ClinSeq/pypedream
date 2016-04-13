@@ -1,4 +1,5 @@
 import os
+import tempfile
 import unittest
 
 from pypedream.pypedreamstatus import PypedreamStatus
@@ -13,7 +14,8 @@ class TestDummyPipelineThatFails(unittest.TestCase):
 
     def test_fail_file_exists(self):
         # arrange
-        self.p = FailingPipeline("/tmp", "first", "second", "third", runner=Shellrunner())
+        outdir = tempfile.mkdtemp()
+        self.p = FailingPipeline(outdir, "first", "second", "third", runner=Shellrunner())
 
         self.p.start()
         self.p.join()

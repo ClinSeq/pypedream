@@ -1,8 +1,8 @@
 import os
+import tempfile
 import unittest
 
-from pypedream.pipeline import dummy_pipeline_that_fails
-from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream.pipeline.dummy_pipeline_that_fails import FailingPipeline
 from pypedream.runners.localqrunner import Localqrunner
 
 
@@ -11,7 +11,8 @@ class TestDummyPipelineThatFails(unittest.TestCase):
 
     def test_fail_file_exists(self):
         # arrange
-        self.p = dummy_pipeline_that_fails.FailingPipeline("/tmp", "first", "second", "third", runner=Localqrunner(4))
+        outdir = tempfile.mkdtemp()
+        self.p = FailingPipeline(outdir, "first", "second", "third", runner=Localqrunner(4))
 
         self.p.start()
         self.p.join()

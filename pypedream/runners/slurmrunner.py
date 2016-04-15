@@ -1,16 +1,18 @@
 import logging
 import re
 import subprocess
-import sys
 import time
 
 import runner
-from pypedream.job import Job
 from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 
 walltime = "12:00:00"  # default to 12 hours
+
+exitcode_cancelled = 100001
+exitcode_failed = 100002
+exitcode_completed = 0
 
 
 class Slurmrunner(runner.Runner):
@@ -27,7 +29,7 @@ class Slurmrunner(runner.Runner):
         self.checkSlurmVersion()
         self.ordered_jobs = pipeline.get_ordered_jobs_to_run()
 
-        #try:
+        # try:
         for job in self.ordered_jobs:
             depjobs = self.pipeline.get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
@@ -53,41 +55,64 @@ class Slurmrunner(runner.Runner):
             logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
-            if self.pipeline.session:
-                self.pipeline.session.add(job)
+        self.pipeline.write_jobs()
 
-        if self.pipeline.session:
-            self.pipeline.session.commit()
-
-        while not self.is_done():
+        while not self.is_done() and not self.pipeline.exit.is_set():
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
+
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
-                    #newjobobj = Job.query.filter_by(jobid=jobid).first()
                     job.status = self.get_job_status(job.jobid)
-            if self.pipeline.session:
-                self.pipeline.session.commit()
+                    if job.status == PypedreamStatus.COMPLETED:
+                        job.complete()
+                    elif job.status == PypedreamStatus.FAILED:
+                        job.fail()
 
-            self.pipeline.cleanup()
+            self.pipeline.write_jobs()
 
-        # except Exception:
-        #     self.stop_all_jobs()
-        #     return 1
+            # self.pipeline.cleanup()
 
         self.pipeline.cleanup()
+        if self.pipeline.exit.is_set():
+            self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
-        d = self.pipeline.get_job_status_dict()
-        print >>sys.stderr, "jobs status is {}".format(d)
-        return_code = d[PypedreamStatus.FAILED] + d[PypedreamStatus.CANCELLED]
-        return return_code
+        d = self.get_job_status_dict()
+        logging.debug("When no more jobs can run, jobs statuses are {}".format(d))
+
+        exitcode = exitcode_completed
+        if d[PypedreamStatus.CANCELLED] > 0:
+            exitcode = exitcode_cancelled
+        elif d[PypedreamStatus.FAILED] > 0:
+            exitcode = exitcode_cancelled
+
+        return exitcode
+
+    def get_job_status_dict(self, fractions=False):
+        """
+        Get a dictionary with number of jobs for each status
+        :rtype: dict[PypedreamStatus, int]
+        """
+        d = {}
+        for st in [PypedreamStatus.COMPLETED, PypedreamStatus.FAILED, PypedreamStatus.PENDING,
+                   PypedreamStatus.RUNNING, PypedreamStatus.CANCELLED, PypedreamStatus.NOT_FOUND]:
+            n = len([j for j in self.ordered_jobs if self.get_job_status(j.jobid) == st])
+            d[st] = n
+        if fractions:
+            tot = sum(d.values())
+            for st in d:
+                d[st] = float(d[st]) / tot
+        return d
 
     def stop_all_jobs(self):
         logging.error("Autoseq failed, cancelling jobs...")
         for job in self.ordered_jobs:
-            job.fail()
-            subprocess.check_output(['scancel', str(job.jobid)])
-        self.pipeline.status = PypedreamStatus.FAILED
+            if self.get_job_status(job.jobid) == PypedreamStatus.RUNNING or \
+                            self.get_job_status(job.jobid) == PypedreamStatus.PENDING:
+                job.fail()
+                job.status = PypedreamStatus.CANCELLED
+                subprocess.check_output(['scancel', str(job.jobid)])
+        self.pipeline.write_jobs()
 
     def get_job_status(self, jobid):
         """
@@ -105,12 +130,12 @@ class Slurmrunner(runner.Runner):
         if not status_str:
             status_str = Slurmrunner._get_job_status_from_sacct(jobid)
 
+        # if we still don't have a status, use NOT_FOUND
+        if not status_str:
+            return PypedreamStatus.NOT_FOUND
+
         # convert string to PypedreamStatus
         status = PypedreamStatus.from_slurm(status_str)
-
-        # if we still don't have a status, use NOT_FOUND
-        if not status:
-            return PypedreamStatus.NOT_FOUND
 
         return status
 
@@ -157,7 +182,10 @@ class Slurmrunner(runner.Runner):
         Get job status string from accounting
         """
         cmd = ['sacct', '-j', str(jobid), '-b', '-P', 'noheader']
-        stdout = subprocess.check_output(cmd)
+        try:
+            stdout = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            return None
         status = None
         if stdout != '':
             jobid_ret, status, exitcode = stdout.strip().split("|")

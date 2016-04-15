@@ -1,4 +1,5 @@
 import abc
+import json
 
 __author__ = 'dankle'
 
@@ -22,6 +23,3 @@ class Runner(object):
     def get_job_status(self, jobid):
         pass
 
-    @abc.abstractmethod
-    def stop_all_jobs(self):
-        pass

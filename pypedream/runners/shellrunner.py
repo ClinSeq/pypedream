@@ -1,6 +1,7 @@
 import logging
 import subprocess
 
+import sys
 from click import progressbar
 
 import runner
@@ -33,15 +34,14 @@ class Shellrunner(runner.Runner):
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:
                 logging.debug("Running {} with script {}".format(job.get_name(), job.script))
+                print >>sys.stderr, "script is {}".format(job.script)
                 cmd = ["sh", job.script]
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
                 proc = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
                 job.status = PypedreamStatus.RUNNING
 
-                if self.pipeline.session:
-                    self.pipeline.session.add(job)
-                    self.pipeline.session.commit()
+                self.pipeline.write_jobs()
 
                 returncode = proc.wait()
                 logfile.flush()
@@ -52,21 +52,19 @@ class Shellrunner(runner.Runner):
                     logging.error(f.read())
                     f.close()
                     job.fail()
+
+                    self.pipeline.write_jobs()
                     return returncode
+
                 else:
                     job.complete()
 
                     self.pipeline.cleanup()
 
                 logfile.close()
-                if self.pipeline.session:
-                    self.pipeline.session.commit()
+                self.pipeline.write_jobs()
 
         return 0
-
-    def stop_all_jobs(self):
-        # how to we stop a shellrunner?
-        pass
 
     def get_job_status(self, jobid):
         return self.pipeline.get_job_with_id(jobid).status

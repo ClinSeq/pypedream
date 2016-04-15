@@ -2,24 +2,17 @@ import logging
 import os
 import uuid
 
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from pypedream import constants
 from pypedream.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 
-Base = declarative_base()
 
-
-class Job(Base):
+class Job(object):
     """ A abstract class of a tool
     """
-    __tablename__ = "jobs"
-    backendid = Column(Integer, primary_key=True)
-    jobid = Column(Integer)
-    name = Column(String)
-    status = Column(String)
 
     def __init__(self):
         self.script = None
@@ -82,7 +75,7 @@ class Job(Base):
         return hash(str([self.get_inputs(), self.get_outputs()]))
 
     def __str__(self):
-        return self.get_name
+        return self.get_name()
 
     @staticmethod
     def try_remove_files(files):
@@ -97,13 +90,13 @@ class Job(Base):
 
     def complete(self):
         self.status = PypedreamStatus.COMPLETED
-        # self.try_remove_files(self.failfiles())
-        # self.touch_files(self.donefiles())
+        self.try_remove_files(self.failfiles())
+        self.touch_files(self.donefiles())
 
     def fail(self):
         self.status = PypedreamStatus.FAILED
-        # self.try_remove_files(self.donefiles())
-        # self.touch_files(self.failfiles())
+        self.try_remove_files(self.donefiles())
+        self.touch_files(self.failfiles())
 
     def donefiles(self):
         donefiles = []
@@ -134,14 +127,14 @@ class Job(Base):
         idx = hashes.index(hash(self))
 
         logging.debug("Task index is " + str(idx))
-        self.script = "{dir}/{idx}-{name}-{uuid}.sh".format(dir=script_dir,
-                                                            idx=idx,
-                                                            name=self.get_name(),
-                                                            uuid=uuid.uuid4())
+        self.script = "{dir}/{name}__{idx}__{uuid}.sh".format(dir=script_dir,
+                                                              name=self.get_name(),
+                                                              idx=idx,
+                                                              uuid=uuid.uuid4())
 
         f = open(self.script, 'w')
         f.write("#!/usr/bin/env bash\n")
-        # f.write("set -euo pipefail\n")
+        f.write("set -euo pipefail\n")
         # f.write("set -eu\n")
         f.write("\n")
 
@@ -155,15 +148,15 @@ class Job(Base):
         f.write("\n")
         f.write(self.command())
         f.write("\n")
-        f.write("OUT=$?\n")
-        f.write("\n")
-        f.write("if [ $OUT -eq 0 ];then\n")  # success
-        f.write(self.complete_bash() + "\n")
-        f.write("else\n")
-        f.write(self.fail_bash() + "\n")  # fail
-        f.write("fi\n")
-        f.write("\n")
-        f.write("exit $OUT\n")
+        # f.write("OUT=$?\n")
+        # f.write("\n")
+        # f.write("if [ $OUT -eq 0 ];then\n")  # success
+        # f.write(self.complete_bash() + "\n")
+        # f.write("else\n")
+        # f.write(self.fail_bash() + "\n")  # fail
+        # f.write("fi\n")
+        # f.write("\n")
+        # f.write("exit $OUT\n")
         f.close()
 
     def complete_bash(self):

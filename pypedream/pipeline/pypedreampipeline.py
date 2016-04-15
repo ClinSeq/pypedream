@@ -1,15 +1,16 @@
 import inspect
+import json
 import logging
+import multiprocessing
 import os
 import sys
 from multiprocessing import Process
 
 import networkx as nx
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from networkx.drawing.nx_pydot import write_dot
 
 import pypedream.constants
-from pypedream.job import Job, Base
+from pypedream.job import Job
 from pypedream.pypedreamstatus import PypedreamStatus
 from pypedream.runners.shellrunner import Shellrunner
 
@@ -25,34 +26,24 @@ class PypedreamPipeline(Process):
 
     # status = None
 
-    def __init__(self, outdir, scriptdir=None, dot=None, runner=Shellrunner(), jobdb=None):
+    def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None):
         Process.__init__(self)
         self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
-        self.dot = dot
+        self.dot_file = dot_file
         self.runner = runner
         self.outdir = outdir
         self.jobdb = jobdb
-        self.session = None
+        self.exit = multiprocessing.Event()
 
         if not scriptdir:
             self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
 
-        self.setup_db()
-
         logging.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
                                                                                   'scriptdir': self.scriptdir,
                                                                                   'runner': self.runner.__class__,
-                                                                                  'dot': self.dot}))
+                                                                                  'dot_file': self.dot_file}))
 
-    def setup_db(self):
-        if self.jobdb:
-            conn_str = 'sqlite:///{}'.format(self.jobdb)
-            engine = create_engine(conn_str, echo=True)
-            Base.metadata.create_all(engine)
-            Session = sessionmaker()
-            Session.configure(bind=engine)
-            self.session = Session()
 
     def add(self, job):
         """
@@ -83,10 +74,6 @@ class PypedreamPipeline(Process):
 
         self.graph.add_node(job)
         job.name = job.get_name()
-
-        if self.session:
-            self.session.add(job)
-            self.session.commit()
 
     def add_edges(self):
         filenames = self.get_all_files()
@@ -181,12 +168,13 @@ class PypedreamPipeline(Process):
                         tools.append(tool)
         return tools
 
-    def write_dot(self, f):
+    def write_dot(self):
         """ Write a dot file with the pipeline graph
         :param f: file to write
         :return: None
         """
-        nx.write_dot(self.graph, f)
+        if self.dot_file:
+            write_dot(self.graph, self.dot_file)
 
     def write_scripts(self):
         """
@@ -227,39 +215,22 @@ class PypedreamPipeline(Process):
 
     def cleanup(self):
         for output_file in self.get_outputs():
-            delete_file = True
+            keep_file = False
 
             # if any job that has this file as an input is not yet done, keep the file
-            for job in self.get_nodes_with_input(output_file):
-                if job.status != PypedreamStatus.COMPLETED:
-                    delete_file = False
+            jobs = self.get_nodes_with_input(output_file)
+            statuses = set([j.status for j in jobs])
+            if statuses != set([PypedreamStatus.COMPLETED]):
+                keep_file = True
 
             # if the job that generated this file is marked as !is_intermediate, keep the file
             for job in self.get_nodes_with_output(output_file):
                 if not job.is_intermediate:
-                    delete_file = False
+                    keep_file = True
 
-            if delete_file and os.path.exists(output_file):
+            if not keep_file and os.path.exists(output_file):
+                logging.debug("removing intermediate file {}".format(output_file))
                 os.remove(output_file)
-
-        for job in self.graph.nodes():
-            input_files = job.get_inputs()
-
-    def get_job_status_dict(self, fractions=False):
-        """
-        Get a dictionary with number of jobs for each status
-        :rtype: dict[PypedreamStatus, int]
-        """
-        d = {}
-        for st in [PypedreamStatus.COMPLETED, PypedreamStatus.FAILED, PypedreamStatus.PENDING,
-                   PypedreamStatus.RUNNING, PypedreamStatus.CANCELLED, PypedreamStatus.NOT_FOUND]:
-            n = len([j for j in self.graph.nodes() if j.status == st])
-            d[st] = n
-        if fractions:
-            tot = sum(d.values())
-            for st in d:
-                d[st] = float(d[st]) / tot
-        return d
 
     def total_jobs(self):
         return sum(self.get_job_status_dict().values())
@@ -267,7 +238,13 @@ class PypedreamPipeline(Process):
     def run(self):
         self.status = PypedreamStatus.RUNNING
         self.add_edges()
+
+        if self.dot_file:
+            self.write_dot()
+
+        self.write_jobs()
         return_code = self.runner.run(self)
+
         if return_code == 0:
             logging.info("Pipeline finished successfully. ")
             self.status = PypedreamStatus.COMPLETED
@@ -276,8 +253,22 @@ class PypedreamPipeline(Process):
             self.status = PypedreamStatus.FAILED
             sys.exit(1)
 
+    def stop(self):
+        self.exit.set()
+
     def stop_all_jobs(self):
         self.runner.stop_all_jobs()
+
+    def write_jobs(self):
+        if self.jobdb:
+            with open(self.jobdb, 'w') as f:
+                jobs = {}
+                for j in self.graph.nodes():
+                    jobs[hash(j)] = {'jobname': j.jobname,
+                                     'status': j.status,
+                                     'jobid': j.jobid}
+
+                json.dump(jobs, f)
 
 
 # http://stackoverflow.com/questions/480214

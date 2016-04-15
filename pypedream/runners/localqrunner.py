@@ -26,6 +26,7 @@ class Localqrunner(Runner):
         self.pipeline = None
         self.threads = threads
         self.server = None
+        self.ordered_jobs = None
 
     def run(self, pipeline):
         """
@@ -37,8 +38,7 @@ class Localqrunner(Runner):
         self.pipeline = pipeline
         self.server = LocalQServer(num_cores_available=self.threads, interval=0.1)
         ordered_jobs_to_run = self.pipeline.get_ordered_jobs_to_run()
-        all_ordered_jobs = self.pipeline.get_ordered_jobs()
-
+        self.ordered_jobs = self.pipeline.get_ordered_jobs()
         logging.info("Starting")
         time.sleep(2)
 
@@ -53,20 +53,19 @@ class Localqrunner(Runner):
                     "Job {} could not be submitted with {} requested cores. {} cores available on the localq server.".format(
                         job.get_name(), job.threads, self.server.num_cores_available))
 
-        if self.pipeline.session:
-            self.pipeline.session.commit()
+        self.pipeline.write_jobs()
 
-        n_pending = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.PENDING])
-        n_done = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.COMPLETED])
-        n_failed = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED])
-        n_running = len([j for j in all_ordered_jobs if j.status == PypedreamStatus.RUNNING])
+        n_pending = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING])
+        n_done = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.COMPLETED])
+        n_failed = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.FAILED])
+        n_running = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.RUNNING])
 
         self.server.run()
 
         start_time = datetime.datetime.now()
         last_time = datetime.datetime.now()
 
-        logging.info("Pipeline starting with {} jobs.".format(len(all_ordered_jobs)))
+        logging.info("Pipeline starting with {} jobs.".format(len(self.ordered_jobs)))
         logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
         def is_done(server):
@@ -89,24 +88,24 @@ class Localqrunner(Runner):
             time.sleep(1)
             self.update_job_status()
 
-            job_status = [j.status for j in all_ordered_jobs]
+            job_status = [j.status for j in self.ordered_jobs]
             n_pending = len([s for s in job_status if s == PypedreamStatus.PENDING])
             n_done_current = len([s for s in job_status if s == PypedreamStatus.COMPLETED])
             n_failed_current = len([s for s in job_status if s == PypedreamStatus.FAILED])
-            n_running = len(all_ordered_jobs) - n_pending - n_done_current - n_failed_current
+            n_running = len(self.ordered_jobs) - n_pending - n_done_current - n_failed_current
 
             if n_done_current > n_done or n_failed_current > n_failed:
                 n_done = n_done_current
                 n_failed = n_failed_current
                 if n_failed_current > 0:
-                    jf = [j for j in all_ordered_jobs if j.status == PypedreamStatus.FAILED]
+                    jf = [j for j in self.ordered_jobs if j.status == PypedreamStatus.FAILED]
                     logging.debug("Jobs {} have failed".format([j.jobid for j in jf]))
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-            self.pipeline.cleanup()
+            #self.pipeline.cleanup()
 
         self.pipeline.cleanup()
-        d = self.pipeline.get_job_status_dict()
+        d = self.get_job_status_dict()
         return_code = d[PypedreamStatus.FAILED] + d[PypedreamStatus.CANCELLED]
         self.update_job_status()
 
@@ -125,8 +124,7 @@ class Localqrunner(Runner):
                 # pypedreamjob.touch_files(pypedreamjob.failfiles())
                 pypedreamjob.fail()
 
-        if self.pipeline.session:
-            self.pipeline.session.commit()
+        self.pipeline.write_jobs()
 
     def get_job_stats(self):
         return [j.info_dict() for j in self.server.graph.nodes()]
@@ -136,7 +134,24 @@ class Localqrunner(Runner):
         self.server.stop_all_jobs()
 
     def get_job_status(self, jobid):
-        return PypedreamStatus.NOT_FOUND
+        job = [j for j in self.ordered_jobs if j.jobid == jobid][0]
+        return job.status
+
+    def get_job_status_dict(self, fractions=False):
+        """
+        Get a dictionary with number of jobs for each status
+        :rtype: dict[PypedreamStatus, int]
+        """
+        d = {}
+        for st in [PypedreamStatus.COMPLETED, PypedreamStatus.FAILED, PypedreamStatus.PENDING,
+                   PypedreamStatus.RUNNING, PypedreamStatus.CANCELLED, PypedreamStatus.NOT_FOUND]:
+            n = len([j for j in self.ordered_jobs if self.get_job_status(j.jobid) == st])
+            d[st] = n
+        if fractions:
+            tot = sum(d.values())
+            for st in d:
+                d[st] = float(d[st]) / tot
+        return d
 
 
 # http://stackoverflow.com/questions/480214

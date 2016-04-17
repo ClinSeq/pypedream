@@ -81,16 +81,17 @@ class Slurmrunner(runner.Runner):
         logging.debug("When no more jobs can run, jobs statuses are {}".format(d))
 
         exitcode = exitcode_completed
-        if d[PypedreamStatus.CANCELLED] > 0:
+        if self.pipeline.exit.is_set():
             exitcode = exitcode_cancelled
         elif d[PypedreamStatus.FAILED] > 0:
             exitcode = exitcode_cancelled
 
+        self.pipeline.write_jobs()
         return exitcode
 
     def get_job_status_dict(self, fractions=False):
         """
-        Get a dictionary with number of jobs for each status
+        Get a dictionary with number or fraction of jobs for each status
         :rtype: dict[PypedreamStatus, int]
         """
         d = {}
@@ -101,7 +102,10 @@ class Slurmrunner(runner.Runner):
         if fractions:
             tot = sum(d.values())
             for st in d:
-                d[st] = float(d[st]) / tot
+                if tot != 0:
+                    d[st] = float(d[st]) / tot
+                else:
+                    d[st] = 0
         return d
 
     def stop_all_jobs(self):

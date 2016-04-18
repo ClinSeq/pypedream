@@ -260,7 +260,9 @@ class PypedreamPipeline(Process):
             else:
                 self.status = PypedreamStatus.FAILED
             logging.info("Pipeline failed with exit code {}.".format(return_code))
-            sys.exit(1)
+
+        self.write_jobs()
+        sys.exit(return_code)
 
     def stop(self):
         self.exit.set()
@@ -286,7 +288,8 @@ class PypedreamPipeline(Process):
 
                 d = {'jobs': jobs,
                      'starttime': self.starttime,
-                     'endtime': self.endtime
+                     'endtime': self.endtime,
+                     'exitcode': self.exitcode
                      }
 
                 json.dump(d, f, indent=4)

@@ -247,7 +247,6 @@ class PypedreamPipeline(Process):
 
         self.write_jobs()
         self.runner_returncode = self.runner.run(self)
-        print >>sys.stderr, "exitcode was {}".format(self.runner_returncode)
         self.endtime = datetime.datetime.now().isoformat()
 
         if self.runner_returncode == 0:
@@ -290,7 +289,7 @@ class PypedreamPipeline(Process):
                 d = {'jobs': jobs,
                      'starttime': self.starttime,
                      'endtime': self.endtime,
-                     'exitcode': self.exitcode
+                     'exitcode': self.runner_returncode
                      }
 
                 json.dump(d, f, indent=4)

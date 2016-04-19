@@ -37,31 +37,25 @@ class Shellrunner(runner.Runner):
                 cmd = ["sh", job.script]
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
-                proc = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
                 job.status = PypedreamStatus.RUNNING
-
-                self.pipeline.write_jobs()
-
-                returncode = proc.wait()
-                logfile.flush()
-                if returncode != 0:
-                    f = open(job.log)
-                    logging.error("Task " + job.get_name() + " failed with exit code " + str(returncode))
-                    logging.error("Contents of " + job.log + ":")
-                    logging.error(f.read())
-                    f.close()
-                    job.fail()
-
-                    self.pipeline.write_jobs()
-                    return returncode
-
-                else:
+                proc = None
+                try:
+                    proc = subprocess.check_call(cmd, stdout=logfile, stderr=logfile)
                     job.complete()
+                except subprocess.CalledProcessError as err:
+                    job.fail()
+                    self.pipeline.write_jobs()
+                    logfile.flush()
+                    with open(job.log, 'r') as logf:
+                        logging.warning("Task {} failed with exit code {}".format(job.get_name(),
+                                                                                  err.returncode))
+                        logging.warning("Contents of " + job.log + ":")
+                        logging.warning(logf.read())
+                    return err.returncode
 
-                    self.pipeline.cleanup()
-
-                logfile.close()
+                self.pipeline.cleanup()
                 self.pipeline.write_jobs()
+                logfile.close()
 
         return 0
 

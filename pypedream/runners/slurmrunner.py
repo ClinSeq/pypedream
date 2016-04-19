@@ -74,8 +74,8 @@ class Slurmrunner(runner.Runner):
             # self.pipeline.cleanup()
 
         self.pipeline.cleanup()
-        if self.pipeline.exit.is_set():
-            self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
+	if self.pipeline.exit.is_set():
+	    self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
         d = self.get_job_status_dict()
         logging.debug("When no more jobs can run, jobs statuses are {}".format(d))
@@ -170,7 +170,7 @@ class Slurmrunner(runner.Runner):
 
         try:
             cmd = ['squeue', '-j', str(jobid), '--noheader', '-t', 'all', '-o', '%all']
-            stdout = subprocess.check_output(cmd)
+            stdout = subprocess.check_output(cmd, stderr="/dev/null")
             short_status = stdout.strip().split("|")[19]  # 20th element is shorthand version of the status
             if short_status in short2long:
                 status = short2long[short_status]

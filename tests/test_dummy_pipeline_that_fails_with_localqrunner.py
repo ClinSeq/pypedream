@@ -22,4 +22,4 @@ class TestDummyPipelineThatFails(unittest.TestCase):
                             "Pipeline exitcode should be nonzero when failing (got {})".format(self.p.exitcode))
 
         # assert, .fail file should be in place
-        self.assertTrue(os.path.exists("/tmp/.second.fail"))
+        self.assertTrue(os.path.exists(os.path.join(outdir, ".second.fail")))

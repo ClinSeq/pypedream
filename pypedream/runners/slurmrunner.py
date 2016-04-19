@@ -108,7 +108,6 @@ class Slurmrunner(runner.Runner):
         return d
 
     def stop_all_jobs(self):
-        logging.error("Autoseq failed, cancelling jobs...")
         for job in self.ordered_jobs:
             if self.get_job_status(job.jobid) == PypedreamStatus.RUNNING or \
                             self.get_job_status(job.jobid) == PypedreamStatus.PENDING:

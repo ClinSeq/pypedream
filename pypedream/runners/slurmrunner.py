@@ -74,8 +74,7 @@ class Slurmrunner(runner.Runner):
             # self.pipeline.cleanup()
 
         self.pipeline.cleanup()
-	if self.pipeline.exit.is_set():
-	    self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
+        self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
         d = self.get_job_status_dict()
         logging.debug("When no more jobs can run, jobs statuses are {}".format(d))

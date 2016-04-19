@@ -28,6 +28,7 @@ class PypedreamPipeline(Process):
     starttime = None
     endtime = None
     status = None
+    exitcode = None
 
     def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None):
         Process.__init__(self)
@@ -245,24 +246,24 @@ class PypedreamPipeline(Process):
             self.write_dot()
 
         self.write_jobs()
-        return_code = self.runner.run(self)
+        self.exitcode = self.runner.run(self)
 
         self.endtime = datetime.datetime.now().isoformat()
 
-        if return_code == 0:
+        if self.exitcode == 0:
             logging.info("Pipeline finished successfully. ")
             self.status = PypedreamStatus.COMPLETED
         else:
-            if return_code == slurmrunner.exitcode_cancelled:
+            if self.exitcode == slurmrunner.exitcode_cancelled:
                 self.status = PypedreamStatus.CANCELLED
-            elif return_code == slurmrunner.exitcode_failed:
+            elif self.exitcode == slurmrunner.exitcode_failed:
                 self.status = PypedreamStatus.FAILED
             else:
                 self.status = PypedreamStatus.FAILED
-            logging.info("Pipeline failed with exit code {}.".format(return_code))
+            logging.info("Pipeline failed with exit code {}.".format(self.exitcode))
 
         self.write_jobs()
-        sys.exit(return_code)
+        sys.exit(self.exitcode)
 
     def stop(self):
         self.exit.set()

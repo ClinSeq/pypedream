@@ -169,7 +169,7 @@ class Slurmrunner(runner.Runner):
 
         try:
             cmd = ['squeue', '-j', str(jobid), '--noheader', '-t', 'all', '-o', '%all']
-            stdout = subprocess.check_output(cmd, stderr="/dev/null")
+            stdout = subprocess.check_output(cmd, stderr=open("/dev/null", "w"))
             short_status = stdout.strip().split("|")[19]  # 20th element is shorthand version of the status
             if short_status in short2long:
                 status = short2long[short_status]

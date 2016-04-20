@@ -135,7 +135,7 @@ class Job(object):
 
         f = open(self.script, 'w')
         f.write("#!/usr/bin/env bash\n")
-        f.write("set -euo pipefail\n")
+        f.write("set -eo pipefail\n")
         # f.write("set -eu\n")
         f.write("\n")
 

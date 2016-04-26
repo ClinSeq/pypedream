@@ -55,7 +55,7 @@ class Slurmrunner(runner.Runner):
             logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
         while not self.is_done() and not self.pipeline.exit.is_set():
             time.sleep(self.interval)
@@ -69,7 +69,7 @@ class Slurmrunner(runner.Runner):
                     elif job.status == PypedreamStatus.FAILED:
                         job.fail()
 
-            self.pipeline.write_jobs()
+            self.pipeline.write_jobdb_json()
 
             # self.pipeline.cleanup()
 
@@ -85,7 +85,7 @@ class Slurmrunner(runner.Runner):
         elif d[PypedreamStatus.FAILED] > 0:
             exitcode = exitcode_cancelled
 
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
         return exitcode
 
     def get_job_status_dict(self, fractions=False):
@@ -114,7 +114,7 @@ class Slurmrunner(runner.Runner):
                 job.fail()
                 job.status = PypedreamStatus.CANCELLED
                 subprocess.check_output(['scancel', str(job.jobid)])
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
     def get_job_status(self, jobid):
         """

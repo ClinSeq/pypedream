@@ -44,7 +44,7 @@ class Shellrunner(runner.Runner):
                     job.complete()
                 except subprocess.CalledProcessError as err:
                     job.fail()
-                    self.pipeline.write_jobs()
+                    self.pipeline.write_jobdb_json()
                     logfile.flush()
                     with open(job.log, 'r') as logf:
                         logging.warning("Task {} failed with exit code {}".format(job.get_name(),
@@ -54,7 +54,7 @@ class Shellrunner(runner.Runner):
                     return err.returncode
 
                 self.pipeline.cleanup()
-                self.pipeline.write_jobs()
+                self.pipeline.write_jobdb_json()
                 logfile.close()
 
         return 0

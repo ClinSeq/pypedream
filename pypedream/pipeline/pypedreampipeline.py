@@ -245,7 +245,7 @@ class PypedreamPipeline(Process):
         if self.dot_file:
             self.write_dot()
 
-        self.write_jobs()
+        self.write_jobdb_json()
         self.runner_returncode = self.runner.run(self)
         self.endtime = datetime.datetime.now().isoformat()
 
@@ -261,7 +261,7 @@ class PypedreamPipeline(Process):
                 self.status = PypedreamStatus.FAILED
             logging.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
 
-        self.write_jobs()
+        self.write_jobdb_json()
         sys.exit(self.runner_returncode)
 
     def stop(self):
@@ -270,7 +270,7 @@ class PypedreamPipeline(Process):
     def stop_all_jobs(self):
         self.runner.stop_all_jobs()
 
-    def write_jobs(self):
+    def write_jobdb_json(self):
         if self.jobdb:
             with open(self.jobdb, 'w') as f:
                 jobs = []
@@ -289,7 +289,8 @@ class PypedreamPipeline(Process):
                 d = {'jobs': jobs,
                      'starttime': self.starttime,
                      'endtime': self.endtime,
-                     'exitcode': self.runner_returncode
+                     'exitcode': self.runner_returncode,
+                     'status': self.status
                      }
 
                 json.dump(d, f, indent=4)

@@ -16,6 +16,7 @@ class Job(object):
     starttime = None
     endtime = None
     threads = 1
+    scratch = "/tmp"
     log = None
     script = None
     is_intermediate = False

@@ -3,6 +3,8 @@ import re
 import subprocess
 import time
 
+import datetime
+
 import runner
 from pypedream.pypedreamstatus import PypedreamStatus
 
@@ -55,12 +57,21 @@ class Slurmrunner(runner.Runner):
             logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
         while not self.is_done() and not self.pipeline.exit.is_set():
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
+
+                # Get start and end time for the job from slurm
+                if job.starttime is None or job.endtime is None:
+                    d = Slurmrunner._get_start_and_endtime_from_sacct(job.jobid)
+                    if d:
+                        if d['starttime']:
+                            job.starttime = d['starttime']
+                        if d['endtime']:
+                            job.endtime = d['endtime']
 
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
                     job.status = self.get_job_status(job.jobid)
@@ -69,28 +80,28 @@ class Slurmrunner(runner.Runner):
                     elif job.status == PypedreamStatus.FAILED:
                         job.fail()
 
-            self.pipeline.write_jobs()
+            self.pipeline.write_jobdb_json()
 
             # self.pipeline.cleanup()
 
         self.pipeline.cleanup()
-        if self.pipeline.exit.is_set():
-            self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
+        self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
         d = self.get_job_status_dict()
         logging.debug("When no more jobs can run, jobs statuses are {}".format(d))
 
         exitcode = exitcode_completed
-        if d[PypedreamStatus.CANCELLED] > 0:
+        if self.pipeline.exit.is_set():
             exitcode = exitcode_cancelled
         elif d[PypedreamStatus.FAILED] > 0:
             exitcode = exitcode_cancelled
 
+        self.pipeline.write_jobdb_json()
         return exitcode
 
     def get_job_status_dict(self, fractions=False):
         """
-        Get a dictionary with number of jobs for each status
+        Get a dictionary with number or fraction of jobs for each status
         :rtype: dict[PypedreamStatus, int]
         """
         d = {}
@@ -101,18 +112,20 @@ class Slurmrunner(runner.Runner):
         if fractions:
             tot = sum(d.values())
             for st in d:
-                d[st] = float(d[st]) / tot
+                if tot != 0:
+                    d[st] = float(d[st]) / tot
+                else:
+                    d[st] = 0
         return d
 
     def stop_all_jobs(self):
-        logging.error("Autoseq failed, cancelling jobs...")
         for job in self.ordered_jobs:
             if self.get_job_status(job.jobid) == PypedreamStatus.RUNNING or \
                             self.get_job_status(job.jobid) == PypedreamStatus.PENDING:
                 job.fail()
                 job.status = PypedreamStatus.CANCELLED
                 subprocess.check_output(['scancel', str(job.jobid)])
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
     def get_job_status(self, jobid):
         """
@@ -166,7 +179,7 @@ class Slurmrunner(runner.Runner):
 
         try:
             cmd = ['squeue', '-j', str(jobid), '--noheader', '-t', 'all', '-o', '%all']
-            stdout = subprocess.check_output(cmd)
+            stdout = subprocess.check_output(cmd, stderr=open("/dev/null", "w"))
             short_status = stdout.strip().split("|")[19]  # 20th element is shorthand version of the status
             if short_status in short2long:
                 status = short2long[short_status]
@@ -181,7 +194,7 @@ class Slurmrunner(runner.Runner):
         """
         Get job status string from accounting
         """
-        cmd = ['sacct', '-j', str(jobid), '-b', '-P', 'noheader']
+        cmd = ['sacct', '-j', str(jobid), '-b', '-P', '--noheader']
         try:
             stdout = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
@@ -191,6 +204,36 @@ class Slurmrunner(runner.Runner):
             jobid_ret, status, exitcode = stdout.strip().split("|")
 
         return status
+
+    @staticmethod
+    def _get_start_and_endtime_from_sacct(jobid):
+        """Get start and end times from accounting, returns a dict
+        {'jobid': jobid or none if not found in accounting,
+         'starttime': <datetime obj> or None,
+         'endtime': <datetime obj> or None}
+        """
+        cmd = ['sacct', '-j', str(jobid), '-P', '--noheader', '-o', "JobID,State,ExitCode,Start,End"]
+        try:
+            stdout = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            return None
+        d = {'jobid': jobid,
+             'starttime': None,
+             'endtime': None}
+        if stdout == '':
+            return None
+        else:
+            jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
+            try:
+                d['starttime'] = datetime.datetime.strptime(starttime_str, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                d['starttime'] = None
+            try:
+                d['endtime'] = datetime.datetime.strptime(endtime_str, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                d['endtime'] = None
+
+        return d
 
     def checkSlurmVersion(self):
         cmd = ["sbatch", "--version"]

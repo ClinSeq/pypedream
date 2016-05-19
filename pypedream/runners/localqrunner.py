@@ -53,7 +53,7 @@ class Localqrunner(Runner):
                     "Job {} could not be submitted with {} requested cores. {} cores available on the localq server.".format(
                         job.get_name(), job.threads, self.server.num_cores_available))
 
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
         n_pending = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING])
         n_done = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.COMPLETED])
@@ -124,7 +124,7 @@ class Localqrunner(Runner):
                 # pypedreamjob.touch_files(pypedreamjob.failfiles())
                 pypedreamjob.fail()
 
-        self.pipeline.write_jobs()
+        self.pipeline.write_jobdb_json()
 
     def get_job_stats(self):
         return [j.info_dict() for j in self.server.graph.nodes()]

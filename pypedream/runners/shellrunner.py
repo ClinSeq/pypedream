@@ -2,6 +2,8 @@ import logging
 import subprocess
 
 import sys
+
+import datetime
 from click import progressbar
 
 import runner
@@ -34,35 +36,31 @@ class Shellrunner(runner.Runner):
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:
                 logging.debug("Running {} with script {}".format(job.get_name(), job.script))
-                print >>sys.stderr, "script is {}".format(job.script)
                 cmd = ["sh", job.script]
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
-                proc = subprocess.Popen(cmd, stdout=logfile, stderr=logfile)
                 job.status = PypedreamStatus.RUNNING
-
-                self.pipeline.write_jobs()
-
-                returncode = proc.wait()
-                logfile.flush()
-                if returncode != 0:
-                    f = open(job.log)
-                    logging.error("Task " + job.get_name() + " failed with exit code " + str(returncode))
-                    logging.error("Contents of " + job.log + ":")
-                    logging.error(f.read())
-                    f.close()
-                    job.fail()
-
-                    self.pipeline.write_jobs()
-                    return returncode
-
-                else:
+                job.starttime = datetime.datetime.now().isoformat()
+                proc = None
+                try:
+                    proc = subprocess.check_call(cmd, stdout=logfile, stderr=logfile)
+                    job.endtime = datetime.datetime.now().isoformat()
                     job.complete()
+                except subprocess.CalledProcessError as err:
+                    job.endtime = datetime.datetime.now().isoformat()
+                    job.fail()
+                    self.pipeline.write_jobdb_json()
+                    logfile.flush()
+                    with open(job.log, 'r') as logf:
+                        logging.warning("Task {} failed with exit code {}".format(job.get_name(),
+                                                                                  err.returncode))
+                        logging.warning("Contents of " + job.log + ":")
+                        logging.warning(logf.read())
+                    return err.returncode
 
-                    self.pipeline.cleanup()
-
+                self.pipeline.cleanup()
+                self.pipeline.write_jobdb_json()
                 logfile.close()
-                self.pipeline.write_jobs()
 
         return 0
 

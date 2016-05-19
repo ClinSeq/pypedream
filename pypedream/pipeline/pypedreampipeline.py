@@ -6,8 +6,10 @@ import os
 import sys
 from multiprocessing import Process
 
+import datetime
 import networkx as nx
 from networkx.drawing.nx_pydot import write_dot
+from pypedream.runners import slurmrunner
 
 import pypedream.constants
 from pypedream.job import Job
@@ -23,8 +25,10 @@ __author__ = 'dankle'
 
 class PypedreamPipeline(Process):
     runner = None
-
-    # status = None
+    starttime = None
+    endtime = None
+    status = None
+    runner_returncode = None
 
     def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None):
         Process.__init__(self)
@@ -43,7 +47,6 @@ class PypedreamPipeline(Process):
                                                                                   'scriptdir': self.scriptdir,
                                                                                   'runner': self.runner.__class__,
                                                                                   'dot_file': self.dot_file}))
-
 
     def add(self, job):
         """
@@ -198,8 +201,7 @@ class PypedreamPipeline(Process):
         :return: An array of paths for the runner to run
         """
         if not nx.is_directed_acyclic_graph(self.graph):
-            print "ERROR: The submitted pipeline is not a DAG. Check the pipeline for loops."
-            raise ValueError
+            raise ValueError("ERROR: The submitted pipeline is not a DAG. Check the pipeline for loops.")
 
         ordered_jobs = nx.topological_sort(self.graph)
         return ordered_jobs
@@ -236,22 +238,31 @@ class PypedreamPipeline(Process):
         return sum(self.get_job_status_dict().values())
 
     def run(self):
+        self.starttime = datetime.datetime.now().isoformat()
         self.status = PypedreamStatus.RUNNING
         self.add_edges()
 
         if self.dot_file:
             self.write_dot()
 
-        self.write_jobs()
-        return_code = self.runner.run(self)
+        self.write_jobdb_json()
+        self.runner_returncode = self.runner.run(self)
+        self.endtime = datetime.datetime.now().isoformat()
 
-        if return_code == 0:
+        if self.runner_returncode == 0:
             logging.info("Pipeline finished successfully. ")
             self.status = PypedreamStatus.COMPLETED
         else:
-            logging.info("Pipeline failed with exit code {}.".format(return_code))
-            self.status = PypedreamStatus.FAILED
-            sys.exit(1)
+            if self.runner_returncode == slurmrunner.exitcode_cancelled:
+                self.status = PypedreamStatus.CANCELLED
+            elif self.runner_returncode == slurmrunner.exitcode_failed:
+                self.status = PypedreamStatus.FAILED
+            else:
+                self.status = PypedreamStatus.FAILED
+            logging.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
+
+        self.write_jobdb_json()
+        sys.exit(self.runner_returncode)
 
     def stop(self):
         self.exit.set()
@@ -259,16 +270,30 @@ class PypedreamPipeline(Process):
     def stop_all_jobs(self):
         self.runner.stop_all_jobs()
 
-    def write_jobs(self):
+    def write_jobdb_json(self):
         if self.jobdb:
             with open(self.jobdb, 'w') as f:
-                jobs = {}
-                for j in self.graph.nodes():
-                    jobs[hash(j)] = {'jobname': j.jobname,
-                                     'status': j.status,
-                                     'jobid': j.jobid}
+                jobs = []
+                for j in self.get_ordered_jobs():
+                    jobs.append({'jobname': j.jobname,
+                                 'status': j.status,
+                                 'jobid': j.jobid,
+                                 'inputs': j.get_inputs(),
+                                 'outputs': j.get_outputs(),
+                                 'starttime': j.starttime,
+                                 'endtime': j.endtime,
+                                 'threads': j.threads,
+                                 'log': j.log
+                                 })
 
-                json.dump(jobs, f)
+                d = {'jobs': jobs,
+                     'starttime': self.starttime,
+                     'endtime': self.endtime,
+                     'exitcode': self.runner_returncode,
+                     'status': self.status
+                     }
+
+                json.dump(d, f, indent=4)
 
 
 # http://stackoverflow.com/questions/480214

@@ -2,6 +2,8 @@ import os
 import tempfile
 import unittest
 
+import time
+
 from pypedream.pypedreamstatus import PypedreamStatus
 
 from pypedream import runners
@@ -20,12 +22,12 @@ class TestDummyPipelineThatFails(unittest.TestCase):
         self.p.start()
         self.p.join()
 
-        self.p.add_edges()
-        runner = runners.shellrunner.Shellrunner()
-
         # act, pipeline should return != 0 when failing
         self.assertNotEqual(self.p.exitcode, 0,
                             'Pipeline exitcode should be non-zero when failing (got {})'.format(self.p.exitcode))
 
+        self.assertEqual(self.p.exitcode, 127,
+                            'Pipeline exitcode should be 127 with this error(got {})'.format(self.p.exitcode))
+
         # assert, .fail file should be in place
-        self.assertTrue(os.path.exists("/tmp/.second.fail"))
+        self.assertTrue(os.path.exists(os.path.join(outdir, ".second.fail")))

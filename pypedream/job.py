@@ -2,8 +2,8 @@ import logging
 import os
 import uuid
 
-from sqlalchemy import Column, Integer, String, Boolean
-from sqlalchemy.ext.declarative import declarative_base
+import datetime
+
 from pypedream import constants
 from pypedream.pypedreamstatus import PypedreamStatus
 
@@ -13,24 +13,28 @@ __author__ = 'dankle'
 class Job(object):
     """ A abstract class of a tool
     """
+    jobid = None
+    jobname = None
+    starttime = None
+    endtime = None
+    threads = 1
+    scratch = "/tmp"
+    log = None
+    script = None
+    is_intermediate = False
+    status = PypedreamStatus.PENDING
 
     def __init__(self):
-        self.script = None
-        self.log = None
-        self.threads = 1  # default nbr of threads
-        self.is_intermediate = False
-        self.status = PypedreamStatus.PENDING
-        self.jobid = None
         self.data = {}  # any additional data that the runner needs a job to keep track of
 
     def command(self):
         raise NotImplementedError("Class %s doesn't implement run()" % self.__class__.__name__)
 
     def get_name(self):
-        if "jobname" in self.__dict__:
-            return self.__dict__["jobname"]
+        if self.jobname:
+            return self.jobname
         else:
-            return "clifunc" + str(abs(hash(self)))
+            self.jobname = "clifunc" + str(abs(hash(self)))
 
     def set_log(self):
         outputs = self.get_outputs()
@@ -134,7 +138,7 @@ class Job(object):
 
         f = open(self.script, 'w')
         f.write("#!/usr/bin/env bash\n")
-        f.write("set -euo pipefail\n")
+        f.write("set -eo pipefail\n")
         # f.write("set -eu\n")
         f.write("\n")
 

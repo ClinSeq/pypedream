@@ -67,6 +67,9 @@ class Slurmrunner(runner.Runner):
                 # Get start and end time for the job from slurm
                 if job.starttime is None or job.endtime is None:
                     d = Slurmrunner._get_start_and_endtime_from_sacct(job.jobid)
+                    print "###############################"
+                    print str(d)
+                    print "###############################"
                     if d:
                         if d['starttime']:
                             job.starttime = d['starttime']
@@ -178,9 +181,9 @@ class Slurmrunner(runner.Runner):
                       }
 
         try:
-            cmd = ['squeue', '-j', str(jobid), '--noheader', '-t', 'all', '-o', '%all']
+            cmd = ['squeue', '-j', str(jobid), '--noheader', '-t', 'all', '-o', '%t']
             stdout = subprocess.check_output(cmd, stderr=open("/dev/null", "w"))
-            short_status = stdout.strip().split("|")[19]  # 20th element is shorthand version of the status
+            short_status = stdout.strip()
             if short_status in short2long:
                 status = short2long[short_status]
 

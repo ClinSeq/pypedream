@@ -1,4 +1,4 @@
 pip
 click
-git+https://github.com/dakl/localq.git
+https://github.com/dakl/localq/archive/use-bash.zip
 sqlalchemy

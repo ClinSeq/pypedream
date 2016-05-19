@@ -212,7 +212,7 @@ class Slurmrunner(runner.Runner):
          'starttime': <datetime obj> or None,
          'endtime': <datetime obj> or None}
         """
-        cmd = ['sacct', '-j', str(jobid), '-P', '--noheader', '-o', "JobID,State,ExitCode,Start,End"]
+        cmd = ['sacct', '-j', str(jobid), '-P', '--noheader', '-o', "JobID,Start,End"]
         try:
             stdout = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
@@ -225,11 +225,13 @@ class Slurmrunner(runner.Runner):
         else:
             jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
             try:
-                d['starttime'] = datetime.datetime.strptime(starttime_str, "%Y-%m-%dT%H:%M:%S")
+                d['starttime'] = starttime_str
+                    #datetime.datetime.strptime(starttime_str, "%Y-%m-%dT%H:%M:%S")
             except ValueError:
                 d['starttime'] = None
             try:
-                d['endtime'] = datetime.datetime.strptime(endtime_str, "%Y-%m-%dT%H:%M:%S")
+                d['endtime'] = endtime_str
+                #datetime.datetime.strptime(endtime_str, "%Y-%m-%dT%H:%M:%S")
             except ValueError:
                 d['endtime'] = None
 

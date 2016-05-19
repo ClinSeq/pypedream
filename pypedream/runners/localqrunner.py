@@ -68,23 +68,7 @@ class Localqrunner(Runner):
         logging.info("Pipeline starting with {} jobs.".format(len(self.ordered_jobs)))
         logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-        def is_done(server):
-            """
-            Logic to tell if a server has finished.
-            :param server:
-            :return:
-            """
-            if server.get_runnable_jobs():
-                # if there are still jobs that can run, we're not done
-                return False
-            elif Status.RUNNING in server.get_status_all().values():
-                # if any jobs are running, we're not done
-                return False
-            else:
-                # otherwise, we're done!
-                return True
-
-        while not is_done(self.server):
+        while not self.is_done():
             time.sleep(1)
             self.update_job_status()
 
@@ -102,7 +86,7 @@ class Localqrunner(Runner):
                     logging.debug("Jobs {} have failed".format([j.jobid for j in jf]))
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-            #self.pipeline.cleanup()
+                # self.pipeline.cleanup()
 
         self.pipeline.cleanup()
         d = self.get_job_status_dict()
@@ -111,10 +95,32 @@ class Localqrunner(Runner):
 
         return return_code
 
+    def is_done(self):
+        """
+        Logic to tell if a server has finished.
+        :param server:
+        :return:
+        """
+        if self.server.get_runnable_jobs():
+            # if there are still jobs that can run, we're not done
+            return False
+        elif Status.RUNNING in self.server.get_status_all().values():
+            # if any jobs are running, we're not done
+            return False
+        else:
+            # otherwise, we're done!
+            return True
+
     def update_job_status(self):
         for localqjob in self.server.get_ordered_jobs():
             pypedreamjob = self.pipeline.get_job_with_id(localqjob.jobid)
             pypedreamjob.status = localqjob.status()
+
+            if pypedreamjob.starttime is None:
+                pypedreamjob.starttime = localqjob.start_time
+            if pypedreamjob.endtime is None:
+                pypedreamjob.endtime = localqjob.end_time
+
             if pypedreamjob.status == PypedreamStatus.COMPLETED:
                 # pypedreamjob.try_remove_files(pypedreamjob.failfiles())
                 # pypedreamjob.touch_files(pypedreamjob.donefiles())

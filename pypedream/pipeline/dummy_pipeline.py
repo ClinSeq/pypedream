@@ -11,7 +11,7 @@ class TestPipeline(PypedreamPipeline):
         rnd1 = Urandom()
         rnd1.jobname = "urandom-{}".format(first)
         rnd1.output = outdir + "/" + first
-        rnd1.threads = 2
+        rnd1.threads = 1
         self.add(rnd1)
 
         rnd2 = Urandom()

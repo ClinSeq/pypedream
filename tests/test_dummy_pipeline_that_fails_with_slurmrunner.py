@@ -13,8 +13,8 @@ class TestDummyPipelineThatFails(unittest.TestCase):
         # arrange
         outdir = tempfile.mkdtemp()
         self.p = FailingPipeline(outdir, "first-slurm-testfail", "second-slurm-testfail",
-                                                           "third-slurm-testfail", runner=Slurmrunner(interval=1),
-                                                           jobdb="{}/jobs.db".format(outdir))
+                                 "third-slurm-testfail", runner=Slurmrunner(interval=1),
+                                 jobdb="{}/jobs.db".format(outdir))
 
         self.p.start()
         self.p.join()

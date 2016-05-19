@@ -36,7 +36,7 @@ class Shellrunner(runner.Runner):
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:
                 logging.debug("Running {} with script {}".format(job.get_name(), job.script))
-                cmd = ["sh", job.script]
+                cmd = ["bash", job.script]
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
                 job.status = PypedreamStatus.RUNNING

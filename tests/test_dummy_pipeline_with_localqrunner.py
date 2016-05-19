@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -25,3 +26,10 @@ class TestDummyPipeline(unittest.TestCase):
     def test_intermediate_is_deleted(self):
         self.assertTrue(not os.path.exists(self.outdir + "/second-localq"))
         self.assertTrue(os.path.exists(self.outdir + "/third-localq"))
+
+    def test_starttime_and_endtimes_are_set(self):
+        jobdb = json.load(open("{}/jobs.json".format(self.outdir)))
+        jobs = jobdb['jobs']
+        print str(jobs)
+        self.assertIsNotNone(jobs[0]['starttime'])
+        self.assertIsNotNone(jobs[0]['endtime'])

@@ -3,6 +3,8 @@ import re
 import subprocess
 import time
 
+import datetime
+
 import runner
 from pypedream.pypedreamstatus import PypedreamStatus
 
@@ -61,6 +63,15 @@ class Slurmrunner(runner.Runner):
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
+
+                # Get start and end time for the job from slurm
+                if job.starttime is None or job.endtime is None:
+                    d = Slurmrunner._get_start_and_endtime_from_sacct(job.jobid)
+                    if d:
+                        if d['starttime']:
+                            job.starttime = d['starttime']
+                        if d['endtime']:
+                            job.endtime = d['endtime']
 
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
                     job.status = self.get_job_status(job.jobid)
@@ -183,7 +194,7 @@ class Slurmrunner(runner.Runner):
         """
         Get job status string from accounting
         """
-        cmd = ['sacct', '-j', str(jobid), '-b', '-P', 'noheader']
+        cmd = ['sacct', '-j', str(jobid), '-b', '-P', '--noheader']
         try:
             stdout = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
@@ -193,6 +204,36 @@ class Slurmrunner(runner.Runner):
             jobid_ret, status, exitcode = stdout.strip().split("|")
 
         return status
+
+    @staticmethod
+    def _get_start_and_endtime_from_sacct(jobid):
+        """Get start and end times from accounting, returns a dict
+        {'jobid': jobid or none if not found in accounting,
+         'starttime': <datetime obj> or None,
+         'endtime': <datetime obj> or None}
+        """
+        cmd = ['sacct', '-j', str(jobid), '-P', '--noheader', '-o', "JobID,State,ExitCode,Start,End"]
+        try:
+            stdout = subprocess.check_output(cmd)
+        except subprocess.CalledProcessError:
+            return None
+        d = {'jobid': jobid,
+             'starttime': None,
+             'endtime': None}
+        if stdout == '':
+            return None
+        else:
+            jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
+            try:
+                d['starttime'] = datetime.datetime.strptime(starttime_str, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                d['starttime'] = None
+            try:
+                d['endtime'] = datetime.datetime.strptime(endtime_str, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                d['endtime'] = None
+
+        return d
 
     def checkSlurmVersion(self):
         cmd = ["sbatch", "--version"]

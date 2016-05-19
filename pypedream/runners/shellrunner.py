@@ -2,6 +2,8 @@ import logging
 import subprocess
 
 import sys
+
+import datetime
 from click import progressbar
 
 import runner
@@ -38,11 +40,14 @@ class Shellrunner(runner.Runner):
                 logfile = open(job.log, 'w')
                 logging.debug("writing to log {}".format(job.log))
                 job.status = PypedreamStatus.RUNNING
+                job.starttime = datetime.datetime.now().isoformat()
                 proc = None
                 try:
                     proc = subprocess.check_call(cmd, stdout=logfile, stderr=logfile)
+                    job.endtime = datetime.datetime.now().isoformat()
                     job.complete()
                 except subprocess.CalledProcessError as err:
+                    job.endtime = datetime.datetime.now().isoformat()
                     job.fail()
                     self.pipeline.write_jobdb_json()
                     logfile.flush()

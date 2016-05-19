@@ -10,6 +10,30 @@ before_install:
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
   - bash Miniconda-latest-Linux-x86_64.sh -b -p $HOME/miniconda2 -f
 
+  - sudo apt-get install slurm-llnl
+
+  - sudo mkdir /usr/local/slurm
+  - sudo chown slurm /usr/local/slurm
+  - sudo chgrp slurm /usr/local/slurm
+  - sudo mkdir /usr/local/slurm/state
+  - sudo chown slurm /usr/local/slurm/state
+  - sudo chgrp slurm /usr/local/slurm/state
+
+  # create munge.key
+  - dd if=/dev/urandom bs=1 count=1024 > /tmp/munge.key
+  - sudo cp /tmp/munge.key /etc/munge/munge.key
+  - sudo chown munge /etc/munge/munge.key
+  - sudo chmod 600 /etc/munge/munge.key
+  - rm /tmp/munge.key
+
+  # copy slurm.conf, customize for node
+  - sed s/mynode/`hostname`/g tests/slurm.conf > tests/slurm-local.conf
+  - sudo cp tests/slurm-local.conf /etc/slurm-llnl/slurm.conf
+
+  # restart slurm for everything to take effect
+  - sudo service munge restart
+  - sudo service slurm-llnl restart
+
 # command to install dependencies
 install:
   - export PATH=$HOME/miniconda2/bin/:$PATH

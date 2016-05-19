@@ -1,7 +1,26 @@
 language: python
+
 python:
   - "2.7"
+
+before_install:
+  # Temporal fix for networking problem: https://github.com/travis-ci/travis-ci/issues/1484
+  - echo "127.0.1.1 "`hostname` | sudo tee /etc/hosts
+  # Get and install anaconda for custom Python installation
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+  - bash Miniconda-latest-Linux-x86_64.sh -b -p $HOME/miniconda2 -f
+
 # command to install dependencies
-install: "pip install -r requirements.txt"
+install:
+  - export PATH=$HOME/miniconda2/bin/:$PATH
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+  - conda install -y pip nose
+
+  - pip install -r requirements.txt
+
 # command to run tests
 script: nosetests

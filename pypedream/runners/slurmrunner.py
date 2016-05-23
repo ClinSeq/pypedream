@@ -67,9 +67,6 @@ class Slurmrunner(runner.Runner):
                 # Get start and end time for the job from slurm
                 if job.starttime is None or job.endtime is None:
                     d = Slurmrunner._get_start_and_endtime_from_sacct(job.jobid)
-                    print "###############################"
-                    print str(d)
-                    print "###############################"
                     if d:
                         if d['starttime']:
                             job.starttime = d['starttime']

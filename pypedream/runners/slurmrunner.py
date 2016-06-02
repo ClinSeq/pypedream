@@ -1,12 +1,13 @@
-import logging
 import re
 import subprocess
 import time
 
-import datetime
-
 import runner
 from pypedream.pypedreamstatus import PypedreamStatus
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 __author__ = 'dankle'
 
@@ -49,35 +50,45 @@ class Slurmrunner(runner.Runner):
             cmd = cmd + [job.script]
             cmd = filter(None, cmd)  # removes empty elements from the list
 
-            logging.debug("Submitting job with command: {}".format(cmd))
+            logger.debug("Submitting job with command: {}".format(cmd))
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
             msg = p.stdout.read()
             m = re.search("\d+", msg)
             jobid = m.group()
-            logging.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
+            logger.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
         self.pipeline.write_jobdb_json()
 
         while not self.is_done() and not self.pipeline.exit.is_set():
+            logger.debug("Sleeping for {} seconds".format(self.interval))
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
 
                 # Get start and end time for the job from slurm
                 if job.starttime is None or job.endtime is None:
-                    d = Slurmrunner._get_start_and_endtime_from_sacct(job.jobid)
-                    if d:
+                    logger.debug("Getting start and end time from slurm accounting for job with id {}".format(job.jobid))
+                    d = Slurmrunner._get_start_and_endtime(job.jobid)
+                    if d['starttime'] or d['endtime']:
+                        logger.debug(
+                            "Success. Setting start and times to {} and {}".format(
+                                d['starttime'], d['endtime']
+                            ))
                         if d['starttime']:
                             job.starttime = d['starttime']
                         if d['endtime']:
                             job.endtime = d['endtime']
+                    else:
+                        logger.debug("Failed to get start and end times from slurm accounting.")
 
                 if job.status != PypedreamStatus.COMPLETED and job.status != PypedreamStatus.FAILED:
                     job.status = self.get_job_status(job.jobid)
                     if job.status == PypedreamStatus.COMPLETED:
+                        logger.debug("Setting status for job {} to COMPLETED".format(job.jobid))
                         job.complete()
                     elif job.status == PypedreamStatus.FAILED:
+                        logger.debug("Setting status for job {} to FAILED".format(job.jobid))
                         job.fail()
 
             self.pipeline.write_jobdb_json()
@@ -206,7 +217,7 @@ class Slurmrunner(runner.Runner):
         return status
 
     @staticmethod
-    def _get_start_and_endtime_from_sacct(jobid):
+    def _get_start_and_endtime(jobid):
         """Get start and end times from accounting, returns a dict
         {'jobid': jobid or none if not found in accounting,
          'starttime': <datetime obj> or None,
@@ -214,26 +225,32 @@ class Slurmrunner(runner.Runner):
         """
         cmd = ['sacct', '-j', str(jobid), '-P', '--noheader', '-o', "JobID,Start,End"]
         try:
-            stdout = subprocess.check_output(cmd)
+            stdout = subprocess.check_output(cmd).strip()
         except subprocess.CalledProcessError:
-            return None
+            logger.error("Error running command: {}".format(" ".join(cmd)))
+
         d = {'jobid': jobid,
              'starttime': None,
              'endtime': None}
+
         if stdout == '':
-            return None
+            logger.error("No data returned from command {}".format(" ".join(cmd)))
+            try:
+                # squeue -j 633 -t all -o '%A|%S|%e'
+                squeue_cmd = ['squeue', '-j', str(jobid), '-t', 'all', '--noheader', '-o', "'%A|%S|%e'"]
+                stdout = subprocess.check_output(squeue_cmd).strip()
+                logger.debug("Squeue command was: {}".format(" ".join(squeue_cmd)))
+                logger.debug("data from squeue: {}".format(stdout))
+            except subprocess.CalledProcessError:
+                logger.error("Error running command: {}".format(" ".join(squeue_cmd)))
+
         else:
             jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
-            try:
-                d['starttime'] = starttime_str
-                    #datetime.datetime.strptime(starttime_str, "%Y-%m-%dT%H:%M:%S")
-            except ValueError:
-                d['starttime'] = None
-            try:
-                d['endtime'] = endtime_str
-                #datetime.datetime.strptime(endtime_str, "%Y-%m-%dT%H:%M:%S")
-            except ValueError:
-                d['endtime'] = None
+            invalid_times = ['Unknown', 'N/A']
+            if starttime_str in invalid_times: starttime_str = None
+            if endtime_str in invalid_times: endtime_str = None
+            d['starttime'] = starttime_str
+            d['endtime'] = endtime_str
 
         return d
 

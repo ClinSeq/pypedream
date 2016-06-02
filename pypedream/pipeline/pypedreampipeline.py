@@ -20,6 +20,8 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
+logger = logging.getLogger(__name__)
+
 __author__ = 'dankle'
 
 
@@ -43,7 +45,7 @@ class PypedreamPipeline(Process):
         if not scriptdir:
             self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
 
-        logging.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
+        logger.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
                                                                                   'scriptdir': self.scriptdir,
                                                                                   'runner': self.runner.__class__,
                                                                                   'dot_file': self.dot_file}))
@@ -52,7 +54,7 @@ class PypedreamPipeline(Process):
         """
         :type job:Job
         """
-        logging.debug("Added step {}".format(job.get_name()))
+        logger.debug("Added step {}".format(job.get_name()))
         inputs = []
         outputs = []
         for varname in job.__dict__:
@@ -63,14 +65,14 @@ class PypedreamPipeline(Process):
             if varname.startswith(pypedream.constants.OUTPUT):
                 outputs.append(varname)
 
-        logging.debug("  inputs: " + str(inputs))
-        logging.debug("  outputs: " + str(outputs))
+        logger.debug("  inputs: " + str(inputs))
+        logger.debug("  outputs: " + str(outputs))
         job.set_log()
-        logging.debug("Will write log to {}".format(job.log))
-        logging.debug("inputs are: {}".format(job.get_inputs()))
-        logging.debug("outputs are: {}".format(job.get_outputs()))
-        logging.debug("donefiles are: {}".format(job.donefiles()))
-        logging.debug("failfiles are: {}".format(job.failfiles()))
+        logger.debug("Will write log to {}".format(job.log))
+        logger.debug("inputs are: {}".format(job.get_inputs()))
+        logger.debug("outputs are: {}".format(job.get_outputs()))
+        logger.debug("donefiles are: {}".format(job.donefiles()))
+        logger.debug("failfiles are: {}".format(job.failfiles()))
 
         if job.all_donefiles_exists():
             job.status = PypedreamStatus.COMPLETED
@@ -90,7 +92,7 @@ class PypedreamPipeline(Process):
                             raise ValueError("input node {} is not in graph".format(i))
                         if o not in self.graph.nodes():
                             raise ValueError("output node {} is not in graph".format(o))
-                        logging.debug(
+                        logger.debug(
                             "Adding edge from " + o.get_name() + " to " + i.get_name() + " with name " + fname)
 
                         self.graph.add_edges_from([(o, i)], filename=fname)
@@ -185,16 +187,13 @@ class PypedreamPipeline(Process):
         :param scriptdir: dir to write scripts
         :return:
         """
-        logging.debug("-----------------------------------------------------")
-        logging.debug("Writing scripts.")
+        logger.debug("Writing scripts.")
         if not os.path.exists(self.scriptdir):
-            logging.debug("Output directory " + self.scriptdir + " does not exist. Creating. ")
+            logger.debug("Output directory " + self.scriptdir + " does not exist. Creating. ")
             os.makedirs(self.scriptdir)
 
         for job in self.get_ordered_jobs():
             job.write_script(self.scriptdir, self)
-
-        logging.debug("-----------------------------------------------------")
 
     def get_ordered_jobs(self):
         """ Method to order the tasks in the pipeline
@@ -231,7 +230,7 @@ class PypedreamPipeline(Process):
                     keep_file = True
 
             if not keep_file and os.path.exists(output_file):
-                logging.debug("removing intermediate file {}".format(output_file))
+                logger.debug("Removing intermediate file {}".format(output_file))
                 os.remove(output_file)
 
     def total_jobs(self):
@@ -250,7 +249,7 @@ class PypedreamPipeline(Process):
         self.endtime = datetime.datetime.now().isoformat()
 
         if self.runner_returncode == 0:
-            logging.info("Pipeline finished successfully. ")
+            logger.info("Pipeline finished successfully. ")
             self.status = PypedreamStatus.COMPLETED
         else:
             if self.runner_returncode == slurmrunner.exitcode_cancelled:
@@ -259,7 +258,7 @@ class PypedreamPipeline(Process):
                 self.status = PypedreamStatus.FAILED
             else:
                 self.status = PypedreamStatus.FAILED
-            logging.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
+                logger.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
 
         self.write_jobdb_json()
         sys.exit(self.runner_returncode)

@@ -234,7 +234,6 @@ class Slurmrunner(runner.Runner):
              'endtime': None}
 
         if stdout == '':
-            logger.error("No data returned from command {}".format(" ".join(cmd)))
             try:
                 # squeue -j 633 -t all -o '%A|%S|%e'
                 squeue_cmd = ['squeue', '-j', str(jobid), '-t', 'all', '--noheader', '-o', "'%A|%S|%e'"]
@@ -244,13 +243,12 @@ class Slurmrunner(runner.Runner):
             except subprocess.CalledProcessError:
                 logger.error("Error running command: {}".format(" ".join(squeue_cmd)))
 
-        else:
-            jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
-            invalid_times = ['Unknown', 'N/A']
-            if starttime_str in invalid_times: starttime_str = None
-            if endtime_str in invalid_times: endtime_str = None
-            d['starttime'] = starttime_str
-            d['endtime'] = endtime_str
+        jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
+        invalid_times = ['Unknown', 'N/A']
+        if starttime_str in invalid_times: starttime_str = None
+        if endtime_str in invalid_times: endtime_str = None
+        d['starttime'] = starttime_str
+        d['endtime'] = endtime_str
 
         return d
 

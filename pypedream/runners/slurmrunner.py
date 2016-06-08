@@ -292,7 +292,7 @@ class Slurmrunner(runner.Runner):
         return d
 
     @staticmethod
-    def check_slurm_version(self):
+    def check_slurm_version():
         cmd = ["sbatch", "--version"]
         try:
             p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)

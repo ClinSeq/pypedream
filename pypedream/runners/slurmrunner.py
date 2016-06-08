@@ -29,7 +29,7 @@ class Slurmrunner(runner.Runner):
 
     def run(self, pipeline):
         self.pipeline = pipeline
-        self.checkSlurmVersion()
+        self.check_slurm_version()
         self.ordered_jobs = pipeline.get_ordered_jobs_to_run()
 
         # try:
@@ -163,6 +163,45 @@ class Slurmrunner(runner.Runner):
 
         return status
 
+    def get_runnable_jobs(self):
+        """
+        Get a list of pending jobs that are ready to be run based on dependencies
+        :return: List of Jobs
+        """
+        pending_jobs = [j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING]
+        ready_jobs = []
+        for job in pending_jobs:
+            depjobs = self.pipeline.get_dependencies(job)
+            depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
+
+            # if there are no dependencies, the job is always ready
+            if not depjobids:
+                ready_jobs.append(job)
+            else:
+                # get a list containing the status of all dependencies
+                dependency_status = [self.get_job_status(depid) for depid in depjobids]
+                # if a uniqiefied list contains a single element, and that element is "COMPLETED"
+                # then the job is ready
+                if len(set(dependency_status)) == 1 and dependency_status[0] == PypedreamStatus.COMPLETED:
+                    ready_jobs.append(job)
+        return ready_jobs
+
+    def is_done(self):
+        """
+        Logic to tell if a server has finished.
+        :param server:
+        :return:
+        """
+        if self.get_runnable_jobs():
+            # if there are still jobs that can run, we're not done
+            return False
+        elif PypedreamStatus.RUNNING in [j.status for j in self.ordered_jobs]:
+            # if any jobs are running, we're not done
+            return False
+        else:
+            # otherwise, we're done!
+            return True
+
     @staticmethod
     def _get_job_status_from_squeue(jobid):
         """
@@ -252,7 +291,8 @@ class Slurmrunner(runner.Runner):
 
         return d
 
-    def checkSlurmVersion(self):
+    @staticmethod
+    def check_slurm_version(self):
         cmd = ["sbatch", "--version"]
         try:
             p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -261,41 +301,3 @@ class Slurmrunner(runner.Runner):
         except OSError:
             raise OSError("SLURM (sbatch) not found in system path. Quitting")
 
-    def get_runnable_jobs(self):
-        """
-        Get a list of pending jobs that are ready to be run based on dependencies
-        :return: List of Jobs
-        """
-        pending_jobs = [j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING]
-        ready_jobs = []
-        for job in pending_jobs:
-            depjobs = self.pipeline.get_dependencies(job)
-            depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
-
-            # if there are no dependencies, the job is always ready
-            if not depjobids:
-                ready_jobs.append(job)
-            else:
-                # get a list containing the status of all dependencies
-                dependency_status = [self.get_job_status(depid) for depid in depjobids]
-                # if a uniqiefied list contains a single element, and that element is "COMPLETED"
-                # then the job is ready
-                if len(set(dependency_status)) == 1 and dependency_status[0] == PypedreamStatus.COMPLETED:
-                    ready_jobs.append(job)
-        return ready_jobs
-
-    def is_done(self):
-        """
-        Logic to tell if a server has finished.
-        :param server:
-        :return:
-        """
-        if self.get_runnable_jobs():
-            # if there are still jobs that can run, we're not done
-            return False
-        elif PypedreamStatus.RUNNING in [j.status for j in self.ordered_jobs]:
-            # if any jobs are running, we're not done
-            return False
-        else:
-            # otherwise, we're done!
-            return True

@@ -283,9 +283,11 @@ class Slurmrunner(runner.Runner):
                 logger.error("Error running command: {}".format(" ".join(squeue_cmd)))
 
         jobid_ret, starttime_str, endtime_str = stdout.strip().split("|")
-        invalid_times = ['Unknown', 'N/A']
-        if starttime_str in invalid_times: starttime_str = None
-        if endtime_str in invalid_times: endtime_str = None
+        invalid_times = ['Unknown', 'N/A', 'NONE']
+        if starttime_str in invalid_times:
+            starttime_str = None
+        if endtime_str in invalid_times:
+            endtime_str = None
         d['starttime'] = starttime_str
         d['endtime'] = endtime_str
 

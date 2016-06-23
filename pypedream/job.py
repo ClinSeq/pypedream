@@ -132,7 +132,7 @@ class Job(object):
 
         logging.debug("Task index is " + str(idx))
         self.script = "{dir}/{name}__{idx}__{uuid}.sh".format(dir=script_dir,
-                                                              name=self.get_name(),
+                                                              name=self.get_name().replace("/", "_"),
                                                               idx=idx,
                                                               uuid=uuid.uuid4())
 

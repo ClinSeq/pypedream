@@ -37,13 +37,13 @@ class Localqrunner(Runner):
 
         self.pipeline = pipeline
         self.server = LocalQServer(num_cores_available=self.threads, interval=0.1)
-        ordered_jobs_to_run = self.pipeline.get_ordered_jobs_to_run()
-        self.ordered_jobs = self.pipeline.get_ordered_jobs()
+        ordered_jobs_to_run = self.pipeline._get_ordered_jobs_to_run()
+        self.ordered_jobs = self.pipeline._get_ordered_jobs()
         logging.info("Starting")
         time.sleep(2)
 
         for job in ordered_jobs_to_run:
-            depjobs = self.pipeline.get_dependencies(job)
+            depjobs = self.pipeline._get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j.status != PypedreamStatus.COMPLETED]
 
             job.jobid = self.server.add_script(job.script, job.threads, stdout=job.log, stderr=job.log,
@@ -53,7 +53,7 @@ class Localqrunner(Runner):
                     "Job {} could not be submitted with {} requested cores. {} cores available on the localq server.".format(
                         job.get_name(), job.threads, self.server.num_cores_available))
 
-        self.pipeline.write_jobdb_json()
+        self.pipeline._write_jobdb_json()
 
         n_pending = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING])
         n_done = len([j for j in self.ordered_jobs if j.status == PypedreamStatus.COMPLETED])
@@ -86,9 +86,9 @@ class Localqrunner(Runner):
                     logging.debug("Jobs {} have failed".format([j.jobid for j in jf]))
                 logging.info("{} Pending/{} Running/{} Done/{} Failed".format(n_pending, n_running, n_done, n_failed))
 
-                # self.pipeline.cleanup()
+                # self.pipeline._cleanup()
 
-        self.pipeline.cleanup()
+        self.pipeline._cleanup()
         d = self.get_job_status_dict()
         return_code = d[PypedreamStatus.FAILED] + d[PypedreamStatus.CANCELLED]
         self.update_job_status()
@@ -112,8 +112,8 @@ class Localqrunner(Runner):
             return True
 
     def update_job_status(self):
-        for localqjob in self.server.get_ordered_jobs():
-            pypedreamjob = self.pipeline.get_job_with_id(localqjob.jobid)
+        for localqjob in self.server._get_ordered_jobs():
+            pypedreamjob = self.pipeline._get_job_with_id(localqjob.jobid)
             pypedreamjob.status = localqjob.status()
 
             if pypedreamjob.starttime is None:
@@ -130,14 +130,14 @@ class Localqrunner(Runner):
                 # pypedreamjob.touch_files(pypedreamjob.failfiles())
                 pypedreamjob.fail()
 
-        self.pipeline.write_jobdb_json()
+        self.pipeline._write_jobdb_json()
 
     def get_job_stats(self):
         return [j.info_dict() for j in self.server.graph.nodes()]
 
     def stop_all_jobs(self):
         logging.error("Killing running jobs...")
-        self.server.stop_all_jobs()
+        self.server._stop_all_jobs()
 
     def get_job_status(self, jobid):
         job = [j for j in self.ordered_jobs if j.jobid == jobid][0]

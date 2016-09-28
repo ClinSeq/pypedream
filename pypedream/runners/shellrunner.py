@@ -30,9 +30,9 @@ class Shellrunner(runner.Runner):
         :return: True if no errors occurred, False otherwise
         """
         self.pipeline = pipeline
-        ordered_jobs = self.pipeline.get_ordered_jobs_to_run()
+        ordered_jobs = self.pipeline._get_ordered_jobs_to_run()
 
-        # ordered_jobs = pipeline.get_ordered_jobs()
+        # ordered_jobs = pipeline._get_ordered_jobs()
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:
                 logging.debug("Running {} with script {}".format(job.get_name(), job.script))
@@ -49,7 +49,7 @@ class Shellrunner(runner.Runner):
                 except subprocess.CalledProcessError as err:
                     job.endtime = datetime.datetime.now().isoformat()
                     job.fail()
-                    self.pipeline.write_jobdb_json()
+                    self.pipeline._write_jobdb_json()
                     logfile.flush()
                     with open(job.log, 'r') as logf:
                         logging.warning("Task {} failed with exit code {}".format(job.get_name(),
@@ -58,11 +58,11 @@ class Shellrunner(runner.Runner):
                         logging.warning(logf.read())
                     return err.returncode
 
-                self.pipeline.cleanup()
-                self.pipeline.write_jobdb_json()
+                self.pipeline._cleanup()
+                self.pipeline._write_jobdb_json()
                 logfile.close()
 
         return 0
 
     def get_job_status(self, jobid):
-        return self.pipeline.get_job_with_id(jobid).status
+        return self.pipeline._get_job_with_id(jobid).status

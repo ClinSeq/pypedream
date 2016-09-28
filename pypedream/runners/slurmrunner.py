@@ -30,11 +30,11 @@ class Slurmrunner(runner.Runner):
     def run(self, pipeline):
         self.pipeline = pipeline
         self.check_slurm_version()
-        self.ordered_jobs = pipeline.get_ordered_jobs_to_run()
+        self.ordered_jobs = pipeline._get_ordered_jobs_to_run()
 
         # try:
         for job in self.ordered_jobs:
-            depjobs = self.pipeline.get_dependencies(job)
+            depjobs = self.pipeline._get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
             if depjobids and depjobids is not []:
                 depstring = "--dependency=afterok:" + ":".join(
@@ -58,7 +58,7 @@ class Slurmrunner(runner.Runner):
             logger.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
-        self.pipeline.write_jobdb_json()
+        self.pipeline._write_jobdb_json()
 
         while not self.is_done() and not self.pipeline.exit.is_set():
             logger.debug("Sleeping for {} seconds".format(self.interval))
@@ -91,11 +91,11 @@ class Slurmrunner(runner.Runner):
                         logger.debug("Setting status for job {} to FAILED".format(job.jobid))
                         job.fail()
 
-            self.pipeline.write_jobdb_json()
+            self.pipeline._write_jobdb_json()
 
-            # self.pipeline.cleanup()
+            # self.pipeline._cleanup()
 
-        self.pipeline.cleanup()
+        self.pipeline._cleanup()
         self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
         d = self.get_job_status_dict()
@@ -107,7 +107,7 @@ class Slurmrunner(runner.Runner):
         elif d[PypedreamStatus.FAILED] > 0:
             exitcode = exitcode_cancelled
 
-        self.pipeline.write_jobdb_json()
+        self.pipeline._write_jobdb_json()
         return exitcode
 
     def get_job_status_dict(self, fractions=False):
@@ -136,7 +136,7 @@ class Slurmrunner(runner.Runner):
                 job.fail()
                 job.status = PypedreamStatus.CANCELLED
                 subprocess.check_output(['scancel', str(job.jobid)])
-        self.pipeline.write_jobdb_json()
+        self.pipeline._write_jobdb_json()
 
     def get_job_status(self, jobid):
         """
@@ -171,7 +171,7 @@ class Slurmrunner(runner.Runner):
         pending_jobs = [j for j in self.ordered_jobs if j.status == PypedreamStatus.PENDING]
         ready_jobs = []
         for job in pending_jobs:
-            depjobs = self.pipeline.get_dependencies(job)
+            depjobs = self.pipeline._get_dependencies(job)
             depjobids = [j.jobid for j in depjobs if j in self.ordered_jobs]
 
             # if there are no dependencies, the job is always ready

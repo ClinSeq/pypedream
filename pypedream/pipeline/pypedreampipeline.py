@@ -32,7 +32,7 @@ class PypedreamPipeline(Process):
     status = None
     runner_returncode = None
 
-    def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None):
+    def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None, scratch="/tmp"):
         Process.__init__(self)
         self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
@@ -40,15 +40,16 @@ class PypedreamPipeline(Process):
         self.runner = runner
         self.outdir = outdir
         self.jobdb = jobdb
+        self.scratch = scratch
         self.exit = multiprocessing.Event()
 
         if not scriptdir:
             self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
 
         logger.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
-                                                                                  'scriptdir': self.scriptdir,
-                                                                                  'runner': self.runner.__class__,
-                                                                                  'dot_file': self.dot_file}))
+                                                                                 'scriptdir': self.scriptdir,
+                                                                                 'runner': self.runner.__class__,
+                                                                                 'dot_file': self.dot_file}))
 
     def add(self, job):
         """
@@ -80,11 +81,11 @@ class PypedreamPipeline(Process):
         self.graph.add_node(job)
         job.name = job.get_name()
 
-    def add_edges(self):
-        filenames = self.get_all_files()
+    def _add_edges(self):
+        filenames = self._get_all_files()
         for fname in filenames:
-            inputs = self.get_nodes_with_input(fname)
-            outputs = self.get_nodes_with_output(fname)
+            inputs = self._get_nodes_with_input(fname)
+            outputs = self._get_nodes_with_output(fname)
             if inputs and outputs:
                 for i in inputs:
                     for o in outputs:
@@ -97,9 +98,9 @@ class PypedreamPipeline(Process):
 
                         self.graph.add_edges_from([(o, i)], filename=fname)
 
-        self.write_scripts()
+        self._write_scripts()
 
-    def get_all_files(self):
+    def _get_all_files(self):
         """
         Get names of all files added as inputs or outputs
         :return:
@@ -117,7 +118,7 @@ class PypedreamPipeline(Process):
                             files.append(item)
         return list(set(filter(None, files)))  # filter removes empties, list(set()) uniquifies the list.
 
-    def get_nodes_with_input(self, filename):
+    def _get_nodes_with_input(self, filename):
         """ Get list of nodes (tools) that has "filename" as an input
         :param filename: name of file to search for
         :return: list of tools
@@ -133,7 +134,7 @@ class PypedreamPipeline(Process):
                         tools.append(tool)
         return tools
 
-    def get_dependencies(self, job):
+    def _get_dependencies(self, job):
         """
         Get dependencies
         :type job: job.Job
@@ -141,10 +142,10 @@ class PypedreamPipeline(Process):
         """
         depjobs = []
         for inf in job.get_inputs():
-            depjobs += self.get_nodes_with_output(inf)
+            depjobs += self._get_nodes_with_output(inf)
         return uniq(depjobs)
 
-    def get_job_with_id(self, jobid):
+    def _get_job_with_id(self, jobid):
         if jobid is None:
             return None
         for job in self.graph.nodes():
@@ -153,13 +154,13 @@ class PypedreamPipeline(Process):
                     return job
         return None
 
-    def get_outputs(self):
+    def _get_outputs(self):
         outputs = []
         for job in self.graph.nodes():
             outputs += job.get_outputs()
         return outputs
 
-    def get_nodes_with_output(self, filename):
+    def _get_nodes_with_output(self, filename):
         """ Get list of nodes (tools) that has "filename" as an output
         :param filename: name of file to search for
         :return: list of tools
@@ -173,7 +174,7 @@ class PypedreamPipeline(Process):
                         tools.append(tool)
         return tools
 
-    def write_dot(self):
+    def _write_dot(self):
         """ Write a dot file with the pipeline graph
         :param f: file to write
         :return: None
@@ -181,7 +182,7 @@ class PypedreamPipeline(Process):
         if self.dot_file:
             write_dot(self.graph, self.dot_file)
 
-    def write_scripts(self):
+    def _write_scripts(self):
         """
         Write scripts for all steps in pipeline
         :param scriptdir: dir to write scripts
@@ -192,10 +193,10 @@ class PypedreamPipeline(Process):
             logger.debug("Output directory " + self.scriptdir + " does not exist. Creating. ")
             os.makedirs(self.scriptdir)
 
-        for job in self.get_ordered_jobs():
+        for job in self._get_ordered_jobs():
             job.write_script(self.scriptdir, self)
 
-    def get_ordered_jobs(self):
+    def _get_ordered_jobs(self):
         """ Method to order the tasks in the pipeline
         :return: An array of paths for the runner to run
         """
@@ -205,8 +206,8 @@ class PypedreamPipeline(Process):
         ordered_jobs = nx.topological_sort(self.graph)
         return ordered_jobs
 
-    def get_ordered_jobs_to_run(self):
-        all_jobs = self.get_ordered_jobs()
+    def _get_ordered_jobs_to_run(self):
+        all_jobs = self._get_ordered_jobs()
         jobs_to_run = []
         for job in all_jobs:
             if job.status != PypedreamStatus.COMPLETED:
@@ -214,18 +215,18 @@ class PypedreamPipeline(Process):
 
         return jobs_to_run
 
-    def cleanup(self):
-        for output_file in self.get_outputs():
+    def _cleanup(self):
+        for output_file in self._get_outputs():
             keep_file = False
 
             # if any job that has this file as an input is not yet done, keep the file
-            jobs = self.get_nodes_with_input(output_file)
+            jobs = self._get_nodes_with_input(output_file)
             statuses = set([j.status for j in jobs])
             if statuses != set([PypedreamStatus.COMPLETED]):
                 keep_file = True
 
             # if the job that generated this file is marked as !is_intermediate, keep the file
-            for job in self.get_nodes_with_output(output_file):
+            for job in self._get_nodes_with_output(output_file):
                 if not job.is_intermediate:
                     keep_file = True
 
@@ -233,18 +234,25 @@ class PypedreamPipeline(Process):
                 logger.debug("Removing intermediate file {}".format(output_file))
                 os.remove(output_file)
 
-    def total_jobs(self):
-        return sum(self.get_job_status_dict().values())
+    def _set_scratch(self, global_scratch, override=False):
+        """
+        Set the scratch dir of every added job, while not overriding any manually set scratch dir (default).
+        If 'override' is set, it will ignore a previously set scratch dir.
+        """
+        for job in self.graph.nodes():
+            if not job.scratch or override:
+                job.scratch = global_scratch
 
     def run(self):
+        self._set_scratch(self.scratch)
         self.starttime = datetime.datetime.now().isoformat()
         self.status = PypedreamStatus.RUNNING
-        self.add_edges()
+        self._add_edges()
 
         if self.dot_file:
-            self.write_dot()
+            self._write_dot()
 
-        self.write_jobdb_json()
+        self._write_jobdb_json()
         self.runner_returncode = self.runner.run(self)
         self.endtime = datetime.datetime.now().isoformat()
 
@@ -260,25 +268,36 @@ class PypedreamPipeline(Process):
                 self.status = PypedreamStatus.FAILED
                 logger.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
 
-        self.write_jobdb_json()
+        self._write_jobdb_json()
         sys.exit(self.runner_returncode)
 
     def stop(self):
         self.exit.set()
 
-    def stop_all_jobs(self):
+    def _stop_all_jobs(self):
         self.runner.stop_all_jobs()
 
-    def write_jobdb_json(self):
+    def _write_jobdb_json(self):
         if self.jobdb:
             with open(self.jobdb, 'w') as f:
                 jobs = []
-                for j in self.get_ordered_jobs():
+                for j in self._get_ordered_jobs():
+                    inputs = {}
+                    outputs = {}
+
+                    for varname in j.__dict__:
+                        obj = j.__dict__[varname]  # can be a list or a string
+                        if varname.startswith(pypedream.constants.INPUT):
+                            inputs[varname] = obj
+
+                        if varname.startswith(pypedream.constants.OUTPUT):
+                            outputs[varname] = obj
+
                     jobs.append({'jobname': j.jobname,
                                  'status': j.status,
                                  'jobid': j.jobid,
-                                 'inputs': j.get_inputs(),
-                                 'outputs': j.get_outputs(),
+                                 'inputs': inputs,
+                                 'outputs': outputs,
                                  'starttime': j.starttime,
                                  'endtime': j.endtime,
                                  'threads': j.threads,

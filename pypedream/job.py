@@ -127,7 +127,7 @@ class Job(object):
 
     def write_script(self, script_dir, pipeline):
         logging.debug("Writing script for task " + self.get_name())
-        hashes = [hash(job) for job in pipeline.get_ordered_jobs()]
+        hashes = [hash(job) for job in pipeline._get_ordered_jobs()]
         idx = hashes.index(hash(self))
 
         logging.debug("Task index is " + str(idx))

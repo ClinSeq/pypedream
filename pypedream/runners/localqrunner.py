@@ -112,7 +112,7 @@ class Localqrunner(Runner):
             return True
 
     def update_job_status(self):
-        for localqjob in self.server._get_ordered_jobs():
+        for localqjob in self.server.get_ordered_jobs():
             pypedreamjob = self.pipeline._get_job_with_id(localqjob.jobid)
             pypedreamjob.status = localqjob.status()
 

@@ -32,7 +32,7 @@ class PypedreamPipeline(Process):
     status = None
     runner_returncode = None
 
-    def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None):
+    def __init__(self, outdir, scriptdir=None, dot_file=None, runner=Shellrunner(), jobdb=None, scratch="/tmp"):
         Process.__init__(self)
         self.status = PypedreamStatus.PENDING
         self.graph = nx.MultiDiGraph()
@@ -40,15 +40,16 @@ class PypedreamPipeline(Process):
         self.runner = runner
         self.outdir = outdir
         self.jobdb = jobdb
+        self.scratch = scratch
         self.exit = multiprocessing.Event()
 
         if not scriptdir:
             self.scriptdir = "{}/.pypedream/scripts/".format(self.outdir)
 
         logger.debug("Initialized PypedreamPipeline with parameters: {}".format({'outdir': self.outdir,
-                                                                                  'scriptdir': self.scriptdir,
-                                                                                  'runner': self.runner.__class__,
-                                                                                  'dot_file': self.dot_file}))
+                                                                                 'scriptdir': self.scriptdir,
+                                                                                 'runner': self.runner.__class__,
+                                                                                 'dot_file': self.dot_file}))
 
     def add(self, job):
         """
@@ -233,7 +234,17 @@ class PypedreamPipeline(Process):
                 logger.debug("Removing intermediate file {}".format(output_file))
                 os.remove(output_file)
 
+    def _set_scratch(self, global_scratch, override=False):
+        """
+        Set the scratch dir of every added job, while not overriding any manually set scratch dir (default).
+        If 'override' is set, it will ignore a previously set scratch dir.
+        """
+        for job in self.graph.nodes():
+            if not job.scratch or override:
+                job.scratch = global_scratch
+
     def run(self):
+        self._set_scratch(self.scratch)
         self.starttime = datetime.datetime.now().isoformat()
         self.status = PypedreamStatus.RUNNING
         self._add_edges()
@@ -308,4 +319,3 @@ def uniq(seq):  # renamed from f7()
     seen = set()
     seen_add = seen.add
     return [x for x in seq if not (x in seen or seen_add(x))]
-

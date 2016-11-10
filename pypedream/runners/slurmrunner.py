@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 __author__ = 'dankle'
 
-walltime = "12:00:00"  # default to 12 hours
-
 exitcode_cancelled = 100001
 exitcode_failed = 100002
 exitcode_completed = 0
@@ -43,7 +41,7 @@ class Slurmrunner(runner.Runner):
                 depstring = ""
             cmd = ["sbatch"]
             cmd = cmd + ["-J", job.get_name()]
-            cmd = cmd + ["-t", walltime]
+            cmd = cmd + ["-t", job.walltime]
             cmd = cmd + ["-n", str(job.threads)]
             cmd = cmd + ["-o", job.log]
             cmd = cmd + [depstring]

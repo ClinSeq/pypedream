@@ -23,6 +23,7 @@ class Job(object):
     script = None
     is_intermediate = False
     status = PypedreamStatus.PENDING
+    walltime = "12:00:00"  # default to 12 hours
 
     def __init__(self):
         self.data = {}  # any additional data that the runner needs a job to keep track of

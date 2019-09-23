@@ -44,7 +44,6 @@ class Slurmrunner(runner.Runner):
             cmd = ["sbatch"]
             cmd = cmd + ["-J", job.get_name()]
             cmd = cmd + ["-t", walltime]
-            cmd = cmd + ["--mem-per-cpu", "7000"]
             cmd = cmd + ["-n", str(job.threads)]
             cmd = cmd + ["-o", job.log]
             cmd = cmd + [depstring]

@@ -31,7 +31,7 @@ class Slurmrunner(runner.Runner):
         self.pipeline = pipeline
         self.check_slurm_version()
         self.ordered_jobs = pipeline._get_ordered_jobs_to_run()
-
+        self.complete_jobs =  pipeline._get_ordered_jobs_to_run()
         # try:
         for job in self.ordered_jobs:
             depjobs = self.pipeline._get_dependencies(job)
@@ -58,14 +58,13 @@ class Slurmrunner(runner.Runner):
             logger.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
 
-        self.pipeline._write_jobdb_json()
+        pipeline._write_jobdb_json(self.complete_jobs)
 
         while not self.is_done() and not self.pipeline.exit.is_set():
             logger.debug("Sleeping for {} seconds".format(self.interval))
             time.sleep(self.interval)
 
             for job in self.ordered_jobs:
-
                 # Get start and end time for the job from slurm
                 if job.starttime is None or job.endtime is None:
                     logger.debug("Getting start and end time from slurm accounting for job with id {}".format(job.jobid))
@@ -90,11 +89,11 @@ class Slurmrunner(runner.Runner):
                     elif job.status == PypedreamStatus.FAILED:
                         logger.debug("Setting status for job {} to FAILED".format(job.jobid))
                         job.fail()
-
-            self.pipeline._write_jobdb_json()
-
-            # self.pipeline._cleanup()
-
+            
+            pipeline._write_jobdb_json(self.complete_jobs)
+             
+        
+        pipeline._write_jobdb_json(self.complete_jobs)   
         self.pipeline._cleanup()
         self.stop_all_jobs()  # stop any jobs that are still PENDING with DependencyNeverSatisfied if any upstream job FAILED
 
@@ -107,7 +106,7 @@ class Slurmrunner(runner.Runner):
         elif d[PypedreamStatus.FAILED] > 0:
             exitcode = exitcode_cancelled
 
-        self.pipeline._write_jobdb_json()
+        #self.pipeline._write_jobdb_json()
         return exitcode
 
     def get_job_status_dict(self, fractions=False):
@@ -136,7 +135,7 @@ class Slurmrunner(runner.Runner):
                 job.fail()
                 job.status = PypedreamStatus.CANCELLED
                 subprocess.check_output(['scancel', str(job.jobid)])
-        self.pipeline._write_jobdb_json()
+        self.pipeline._write_jobdb_json(self.complete_jobs)
 
     def get_job_status(self, jobid):
         """

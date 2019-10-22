@@ -202,8 +202,7 @@ class PypedreamPipeline(Process):
         """
         if not nx.is_directed_acyclic_graph(self.graph):
             raise ValueError("ERROR: The submitted pipeline is not a DAG. Check the pipeline for loops.")
-
-        ordered_jobs = nx.topological_sort(self.graph)
+        ordered_jobs = nx.topological_sort(self.graph) 
         return ordered_jobs
 
     def _get_ordered_jobs_to_run(self):
@@ -252,7 +251,6 @@ class PypedreamPipeline(Process):
         if self.dot_file:
             self._write_dot()
 
-        self._write_jobdb_json()
         self.runner_returncode = self.runner.run(self)
         self.endtime = datetime.datetime.now().isoformat()
 
@@ -268,7 +266,6 @@ class PypedreamPipeline(Process):
                 self.status = PypedreamStatus.FAILED
                 logger.info("Pipeline failed with exit code {}.".format(self.runner_returncode))
 
-        self._write_jobdb_json()
         sys.exit(self.runner_returncode)
 
     def stop(self):
@@ -277,11 +274,11 @@ class PypedreamPipeline(Process):
     def _stop_all_jobs(self):
         self.runner.stop_all_jobs()
 
-    def _write_jobdb_json(self):
+    def _write_jobdb_json(self, myjobs):
         if self.jobdb:
             with open(self.jobdb, 'w') as f:
                 jobs = []
-                for j in self._get_ordered_jobs():
+                for j in myjobs:
                     inputs = {}
                     outputs = {}
 

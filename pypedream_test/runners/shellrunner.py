@@ -7,7 +7,7 @@ import datetime
 from click import progressbar
 
 import runner
-from pypedream.pypedreamstatus import PypedreamStatus
+from pypedream_test.pypedreamstatus import PypedreamStatus
 
 __author__ = 'dankle'
 
@@ -49,7 +49,7 @@ class Shellrunner(runner.Runner):
                 except subprocess.CalledProcessError as err:
                     job.endtime = datetime.datetime.now().isoformat()
                     job.fail()
-                    self.pipeline._write_jobdb_json()
+                    self.pipeline._write_jobdb_json(ordered_jobs)
                     logfile.flush()
                     with open(job.log, 'r') as logf:
                         logging.warning("Task {} failed with exit code {}".format(job.get_name(),
@@ -58,10 +58,11 @@ class Shellrunner(runner.Runner):
                         logging.warning(logf.read())
                     return err.returncode
 
-                self.pipeline._cleanup()
-                self.pipeline._write_jobdb_json()
-                logfile.close()
+            self.pipeline._cleanup()
+            self.pipeline._write_jobdb_json(ordered_jobs)
+            logfile.close()
 
+        self.pipeline._cleanup()
         return 0
 
     def get_job_status(self, jobid):

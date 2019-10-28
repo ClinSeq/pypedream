@@ -4,12 +4,13 @@ import time
 
 import runner
 from pypedream.pypedreamstatus import PypedreamStatus
-
 import logging
+from  reprint import output
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-__author__ = 'dankle'
+__author__ = 'dankle; vinay'
 
 walltime = "24:00:00"  # default to 24 hours
 
@@ -26,12 +27,24 @@ class Slurmrunner(runner.Runner):
         self.pipeline = None
         self.ordered_jobs = None
         self.interval = interval
+        self.output_lines = None
+
+    def update_console(self, job_name, job_status, job_id):
+        """
+        Console log for job status
+        """
+        update_status = "Status: " + job_status
+        self.output_lines[job_name.decode()] = update_status.decode() #job_status.decode()
+        return ""
+
 
     def run(self, pipeline):
         self.pipeline = pipeline
         self.check_slurm_version()
         self.ordered_jobs = pipeline._get_ordered_jobs_to_run()
         self.complete_jobs =  pipeline._get_ordered_jobs_to_run()
+        with output(output_type='dict') as out_line:
+            self.output_lines=out_line
         # try:
         for job in self.ordered_jobs:
             depjobs = self.pipeline._get_dependencies(job)
@@ -57,6 +70,9 @@ class Slurmrunner(runner.Runner):
             jobid = m.group()
             logger.info("Submitted job {} with id {} ".format(job.get_name(), jobid))
             job.jobid = jobid
+            job.stime = datetime.now()
+            self.update_console(job.get_name(), self.get_job_status(job.jobid), job.jobid)
+
 
         self.pipeline._write_jobdb_json(self.complete_jobs)
 
@@ -66,6 +82,7 @@ class Slurmrunner(runner.Runner):
 
             for job in self.ordered_jobs:
                 # Get start and end time for the job from slurm
+                self.update_console(job.get_name(), self.get_job_status(job.jobid), job.jobid )
                 if job.starttime is None or job.endtime is None:
                     logger.debug("Getting start and end time from slurm accounting for job with id {}".format(job.jobid))
                     d = Slurmrunner._get_start_and_endtime(job.jobid)

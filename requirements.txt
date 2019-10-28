@@ -2,3 +2,5 @@ pip
 click
 https://github.com/dakl/localq/archive/master.zip
 sqlalchemy
+networkx
+reprint

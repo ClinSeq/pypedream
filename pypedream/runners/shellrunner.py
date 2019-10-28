@@ -31,7 +31,6 @@ class Shellrunner(runner.Runner):
         """
         self.pipeline = pipeline
         ordered_jobs = self.pipeline._get_ordered_jobs_to_run()
-
         # ordered_jobs = pipeline._get_ordered_jobs()
         with progressbar(ordered_jobs, item_show_func=get_job_name) as bar:
             for job in bar:

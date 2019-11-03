@@ -82,7 +82,7 @@ class Slurmrunner(runner.Runner):
 
             for job in self.ordered_jobs:
                 # Get start and end time for the job from slurm
-                self.update_console(job.get_name(), self.get_job_status(job.jobid), job.jobid )
+                #self.update_console(job.get_name(), self.get_job_status(job.jobid), job.jobid )
                 if job.starttime is None or job.endtime is None:
                     logger.debug("Getting start and end time from slurm accounting for job with id {}".format(job.jobid))
                     d = Slurmrunner._get_start_and_endtime(job.jobid)

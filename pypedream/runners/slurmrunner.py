@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 __author__ = 'dankle; vinay'
 
-walltime = "24:00:00"  # default to 24 hours
+walltime = "100:00:00"  # default to 100 hours due to indel_realignment
 
 exitcode_cancelled = 100001
 exitcode_failed = 100002
